@@ -1,5 +1,6 @@
 from django.db import models
 from django.conf import settings
+from django.db.models import Sum
 
 class ChamaGroup(models.Model):
     name = models.CharField(max_length=255, help_text="e.g., Umoja Onion Traders")
