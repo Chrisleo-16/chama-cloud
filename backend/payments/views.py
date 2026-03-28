@@ -1,5 +1,6 @@
 import logging
-from rest_framework import views, status
+from rest_framework import views, status, serializers, generic
+from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from django.conf import settings
@@ -8,10 +9,18 @@ from groups.models import ChamaGroup, Contribution
 
 logger = logging.getLogger(__name__)
 
+class STKPushRequestSerializer(serializers.Serializer):
+    group_id = serializers.IntegerField(help_text="The ID of the ChamaGroup")
+    amount = serializers.DecimalField(max_digits=10, decimal_places=2, help_text="Amount to contribute")
+
 class STKPushView(views.APIView):
     permission_classes = [IsAuthenticated]
+    serializer_class = STKPushRequestSerializer
 
     def post(self, request):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
         amount = request.data.get('amount')
         group_id = request.data.get('group_id')
         phone_number = request.user.phone_number
