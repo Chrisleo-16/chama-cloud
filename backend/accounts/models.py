@@ -44,6 +44,24 @@ class User(AbstractUser):
     role = models.CharField(max_length=20, choices=ROLE_CHOICES, default=MERCHANT)
     business_name = models.CharField(max_length=255, blank=True, null=True)
 
+    mpesa_shortcode = models.CharField(
+        max_length=20, 
+        blank=True, 
+        null=True, 
+        help_text="Wholesaler Paybill or Till Number"
+    )
+    # Daraja B2B needs to know if it's sending to a Paybill (4) or Till (Buy Goods - 2)
+    SHORTCODE_TYPE_CHOICES = [
+        ('PAYBILL', 'Paybill'),
+        ('TILL', 'Till Number (Buy Goods)'),
+    ]
+    shortcode_type = models.CharField(
+        max_length=10, 
+        choices=SHORTCODE_TYPE_CHOICES, 
+        blank=True, 
+        null=True
+    )
+
     USERNAME_FIELD = 'phone_number'
     # This tells createsuperuser what to prompt you for
     REQUIRED_FIELDS = ['first_name', 'last_name'] 
