@@ -46,3 +46,14 @@ class Contribution(models.Model):
 
     def __str__(self):
         return f"{self.merchant.username} - {self.amount} to {self.group.name}"
+
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+        
+        # Only count 'COMPLETED' contributions towards the progress bar
+        completed_total = self.group.contributions.filter(
+            status='COMPLETED'
+        ).aggregate(Sum('amount'))['amount__sum'] or 0.00
+        
+        self.group.current_amount = completed_total
+        self.group.save()
