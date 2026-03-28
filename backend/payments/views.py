@@ -13,7 +13,7 @@ class STKPushRequestSerializer(serializers.Serializer):
     group_id = serializers.IntegerField(help_text="The ID of the ChamaGroup")
     amount = serializers.DecimalField(max_digits=10, decimal_places=2, help_text="Amount to contribute")
 
-class STKPushView(views.APIView):
+class STKPushView(generics.GenericAPIView):
     permission_classes = [IsAuthenticated]
     serializer_class = STKPushRequestSerializer
 
