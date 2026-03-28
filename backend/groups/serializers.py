@@ -8,7 +8,7 @@ class ContributionSerializer(serializers.ModelSerializer):
     class Meta:
         model = Contribution
         fields = ['id', 'group', 'merchant', 'merchant_name', 'amount', 'status', 'created_at']
-        read_only_fields = ['status', 'mpesa_receipt_number', 'merchant']
+        read_only_fields = ['mpesa_receipt_number', 'merchant']
 
 class ChamaGroupSerializer(serializers.ModelSerializer):
     progress_percentage = serializers.SerializerMethodField()
