@@ -39,8 +39,9 @@ class Contribution(models.Model):
     merchant = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='contributions')
     amount = models.DecimalField(max_digits=10, decimal_places=2)
     
-    # We will populate this when the M-Pesa callback hits our server
+
     mpesa_receipt_number = models.CharField(max_length=50, blank=True, null=True, unique=True)
+    checkout_request_id = models.CharField(max_length=100, blank=True, null=True)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='PENDING')
     
     created_at = models.DateTimeField(auto_now_add=True)
