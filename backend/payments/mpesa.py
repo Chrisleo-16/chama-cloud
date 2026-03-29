@@ -20,7 +20,10 @@ class MpesaGateWay:
                 auth=(self.consumer_key, self.consumer_secret), 
                 timeout=10
             )
-            return res.json()['access_token']
+            if res.status_code == 200:
+                return res.json()['access_token']
+            else:
+                raise Exception(f"Safaricom Error {res.status_code}: {res.text}")
         except Exception as e:
             raise Exception(f"Failed to get access token: {str(e)}")
 
