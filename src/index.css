@@ -1,0 +1,195 @@
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,100..900;1,9..144,100..900&family=Plus+Jakarta+Sans:ital,wght@0,200..800;1,200..800&family=DM+Mono:ital,wght@0,300;0,400;0,500;1,300;1,400;1,500&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 45 60% 98%;
+    --foreground: 150 30% 15%;
+    --card: 45 50% 97%;
+    --card-foreground: 150 30% 15%;
+    --popover: 45 60% 98%;
+    --popover-foreground: 150 30% 15%;
+    --primary: 145 65% 29%;
+    --primary-foreground: 45 60% 98%;
+    --secondary: 45 55% 94%;
+    --secondary-foreground: 150 30% 15%;
+    --muted: 45 30% 92%;
+    --muted-foreground: 150 10% 45%;
+    --accent: 44 90% 63%;
+    --accent-foreground: 150 30% 15%;
+    --destructive: 0 60% 50%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 45 20% 88%;
+    --input: 45 20% 88%;
+    --ring: 145 65% 29%;
+    --radius: 0.875rem;
+    --sidebar-background: 45 50% 97%;
+    --sidebar-foreground: 150 30% 15%;
+    --sidebar-primary: 145 65% 29%;
+    --sidebar-primary-foreground: 45 60% 98%;
+    --sidebar-accent: 45 55% 94%;
+    --sidebar-accent-foreground: 150 30% 15%;
+    --sidebar-border: 45 20% 88%;
+    --sidebar-ring: 145 65% 29%;
+    /* Custom Chama tokens */
+    --brand: 145 65% 29%;
+    --brand-light: 145 50% 45%;
+    --cream: 45 60% 98%;
+    --cream-deep: 45 55% 94%;
+    --amber-soft: 44 90% 63%;
+    --success: 145 60% 40%;
+    --warning: 40 90% 55%;
+    --danger: 0 60% 50%;
+    --info: 210 70% 50%;
+  }
+  .dark {
+    --background: 150 20% 8%;
+    --foreground: 45 20% 90%;
+    --card: 150 18% 12%;
+    --card-foreground: 45 20% 90%;
+    --popover: 150 18% 12%;
+    --popover-foreground: 45 20% 90%;
+    --primary: 145 55% 42%;
+    --primary-foreground: 150 20% 8%;
+    --secondary: 150 15% 16%;
+    --secondary-foreground: 45 20% 90%;
+    --muted: 150 12% 18%;
+    --muted-foreground: 45 10% 60%;
+    --accent: 44 80% 55%;
+    --accent-foreground: 150 20% 8%;
+    --destructive: 0 50% 40%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 150 10% 20%;
+    --input: 150 10% 20%;
+    --ring: 145 55% 42%;
+    --sidebar-background: 150 18% 10%;
+    --sidebar-foreground: 45 20% 90%;
+    --sidebar-primary: 145 55% 42%;
+    --sidebar-primary-foreground: 150 20% 8%;
+    --sidebar-accent: 150 15% 16%;
+    --sidebar-accent-foreground: 45 20% 90%;
+    --sidebar-border: 150 10% 20%;
+    --sidebar-ring: 145 55% 42%;
+    --success: 145 60% 45%;
+    --warning: 40 80% 50%;
+    --danger: 0 50% 45%;
+    --info: 210 60% 50%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground font-body antialiased;
+  }
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-display;
+  }
+}
+
+@layer components {
+  .cc-card {
+    @apply bg-card rounded-[var(--radius)] border border-border p-6 transition-all duration-300 hover:shadow-lg hover:-translate-y-1;
+  }
+  .cc-btn-primary {
+    @apply inline-flex items-center justify-center gap-2 rounded-[var(--radius)] bg-primary text-primary-foreground px-6 py-3 font-semibold text-sm transition-all duration-200 hover:shadow-md hover:scale-[1.02] active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+  .cc-btn-outline {
+    @apply inline-flex items-center justify-center gap-2 rounded-[var(--radius)] border-2 border-primary text-primary px-6 py-3 font-semibold text-sm transition-all duration-200 hover:bg-primary hover:text-primary-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2;
+  }
+  .cc-btn-ghost {
+    @apply inline-flex items-center justify-center gap-2 rounded-[var(--radius)] px-4 py-2 text-sm font-medium text-muted-foreground transition-all duration-200 hover:bg-secondary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring;
+  }
+  .cc-section {
+    @apply px-4 sm:px-6 lg:px-8 py-16 md:py-24 max-w-7xl mx-auto;
+  }
+  .cc-badge {
+    @apply inline-flex items-center rounded-full px-3 py-1 text-xs font-medium;
+  }
+  /* Use arbitrary values with CSS variables */
+  .cc-badge-success {
+    @apply bg-[hsl(var(--success))]/10 text-[hsl(var(--success))] border border-[hsl(var(--success))]/20;
+  }
+  .cc-badge-warning {
+    @apply bg-[hsl(var(--warning))]/10 text-[hsl(var(--warning))] border border-[hsl(var(--warning))]/20;
+  }
+  .cc-badge-danger {
+    @apply bg-[hsl(var(--danger))]/10 text-[hsl(var(--danger))] border border-[hsl(var(--danger))]/20;
+  }
+  .cc-badge-info {
+    @apply bg-[hsl(var(--info))]/10 text-[hsl(var(--info))] border border-[hsl(var(--info))]/20;
+  }
+  .cc-input {
+    @apply w-full rounded-[var(--radius)] border border-input bg-background px-4 py-3 text-sm ring-offset-background transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50;
+  }
+  .cc-select {
+    @apply w-full rounded-[var(--radius)] border border-input bg-background px-4 py-3 text-sm ring-offset-background transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2;
+  }
+  .cc-label {
+    @apply block text-sm font-medium text-foreground mb-2;
+  }
+  .cc-table {
+    @apply w-full text-sm;
+  }
+  .cc-table th {
+    @apply text-left py-4 px-4 font-semibold text-muted-foreground border-b border-border;
+  }
+  .cc-table td {
+    @apply py-3 px-4 border-b border-border;
+  }
+  .cc-table tr:last-child td {
+    @apply border-b-0;
+  }
+  .cc-progress {
+    @apply h-2.5 w-full rounded-full bg-secondary overflow-hidden;
+  }
+  .cc-progress-bar {
+    @apply h-full bg-primary rounded-full transition-all duration-500 ease-out;
+  }
+  @keyframes fadeInUp {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  .animate-fade-in-up {
+    animation: fadeInUp 0.4s cubic-bezier(0.2, 0.9, 0.4, 1.1) forwards;
+  }
+}
+
+@layer utilities {
+  .font-mono-num {
+    font-family: 'DM Mono', monospace;
+  }
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+@media print {
+  .no-print {
+    display: none;
+  }
+  body {
+    background: white;
+    color: black;
+  }
+  .cc-card {
+    box-shadow: none;
+    border: 1px solid #ccc;
+    page-break-inside: avoid;
+  }
+}
