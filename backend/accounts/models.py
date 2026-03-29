@@ -43,7 +43,11 @@ class User(AbstractUser):
     # We rely on AbstractUser's built-in first_name and last_name fields
     role = models.CharField(max_length=20, choices=ROLE_CHOICES, default=MERCHANT)
     business_name = models.CharField(max_length=255, blank=True, null=True)
-    
+    business_address = models.TextField(blank=True, null=True, help_text="Physical location for order pickups")
+    business_category = models.CharField(max_length=100, blank=True, null=True)
+
+    business_registration_number = models.CharField(max_length=100, blank=True, null=True)
+    kra_pin = models.CharField(max_length=20, blank=True, null=True)
 
     mpesa_shortcode = models.CharField(
         max_length=20, 
