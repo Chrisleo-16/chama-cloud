@@ -27,7 +27,7 @@ Chama-Cloud bridges the gap between digital savings and physical fulfillment.
 
 ---
 
-## 🔑 Test Accounts (For Judges/Reviewers)
+## 🔑 Test Accounts
 
 To fully experience our multi-role routing and authorization system, please use the following credentials on the live site:
 
@@ -50,7 +50,7 @@ To fully experience our multi-role routing and authorization system, please use 
 
 ## 📸 Screenshots
 
-*(Replace the placeholder links with actual images from your `assets/` folder once uploaded)*
+
 
 | Merchant Dashboard | M-Pesa Integration | Wholesaler QR Scanner |
 | :---: | :---: | :---: |
