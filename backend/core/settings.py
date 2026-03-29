@@ -32,6 +32,11 @@ DEBUG = True
 
 ALLOWED_HOSTS = ['*']
 
+CSRF_TRUSTED_ORIGINS = [
+    'https://chama-cloud-api.onrender.com',
+    'https://chama-cloud.vercel.app', 
+]
+
 
 # Application definition
 
@@ -145,6 +150,7 @@ MPESA_CONSUMER_SECRET = env('MPESA_CONSUMER_SECRET', default='').strip()
 MPESA_SHORTCODE = env('MPESA_SHORTCODE', default='174379').strip()
 MPESA_PASSKEY = env('MPESA_PASSKEY', default='bfb279f9aa9bdbcf158e97dd71a467cd2e0c893059b10f78e6b72ada1ed2c919').strip()
 
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
 # Internationalization
 # https://docs.djangoproject.com/en/6.0/topics/i18n/
