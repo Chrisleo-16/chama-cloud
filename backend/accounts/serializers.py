@@ -25,3 +25,8 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
             shortcode_type=validated_data.get('shortcode_type', None)
         )
         return user
+
+class WholesalerSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = ['id', 'business_name', 'first_name', 'last_name', 'is_verified_wholesaler']

@@ -43,6 +43,7 @@ class User(AbstractUser):
     # We rely on AbstractUser's built-in first_name and last_name fields
     role = models.CharField(max_length=20, choices=ROLE_CHOICES, default=MERCHANT)
     business_name = models.CharField(max_length=255, blank=True, null=True)
+    
 
     mpesa_shortcode = models.CharField(
         max_length=20, 
@@ -60,6 +61,11 @@ class User(AbstractUser):
         choices=SHORTCODE_TYPE_CHOICES, 
         blank=True, 
         null=True
+    )
+
+    is_verified_wholesaler = models.BooleanField(
+        default=False, 
+        help_text="Admin toggles this to True after verifying business docs."
     )
 
     USERNAME_FIELD = 'phone_number'
