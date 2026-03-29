@@ -140,10 +140,10 @@ AUTH_PASSWORD_VALIDATORS = [
 
 AUTH_USER_MODEL = 'accounts.User'
 
-MPESA_CONSUMER_KEY = env('MPESA_CONSUMER_KEY', default='')
-MPESA_CONSUMER_SECRET = env('MPESA_CONSUMER_SECRET', default='')
-MPESA_SHORTCODE = env('MPESA_SHORTCODE', default='174379')
-MPESA_PASSKEY = env('MPESA_PASSKEY', default='bfb279f9aa9bdbcf158e97dd71a467cd2e0c893059b10f78e6b72ada1ed2c919')
+MPESA_CONSUMER_KEY = env('MPESA_CONSUMER_KEY', default='').strip()
+MPESA_CONSUMER_SECRET = env('MPESA_CONSUMER_SECRET', default='').strip()
+MPESA_SHORTCODE = env('MPESA_SHORTCODE', default='174379').strip()
+MPESA_PASSKEY = env('MPESA_PASSKEY', default='bfb279f9aa9bdbcf158e97dd71a467cd2e0c893059b10f78e6b72ada1ed2c919').strip()
 
 
 # Internationalization
