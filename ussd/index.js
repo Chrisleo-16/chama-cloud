@@ -1,12 +1,22 @@
+require("dotenv").config();
 const express = require("express");
 const bodyParser = require("body-parser");
 const axios = require("axios");
+const AfricasTalking = require("africastalking");
 
 const app = express();
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
 
-const API_BASE = "https://chama-cloud-api.onrender.com/api";
+// ─── Africa's Talking Setup ─────────────────────────────────────────────
+const AT = AfricasTalking({
+  username: process.env.AT_USERNAME,
+  apiKey: process.env.AT_API_KEY,
+});
+const sms = AT.SMS;
+
+// ─── ChamaCloud API Base ────────────────────────────────────────────────────
+const API_BASE = process.env.API_BASE || "https://chama-cloud-api.onrender.com/api";
 
 // ─── API Helpers ─────────────────────────────────────────────────────────────
 
@@ -72,7 +82,7 @@ app.post("/ussd", async (req, res) => {
         response = `CON Enter your PIN to continue:`;
         session.pendingAction = "1";
       } else {
-        const groups = await apiGet("/groups/", session.token);
+        const groups = await apiGet("/groups/list/", session.token);
         if (!groups || groups.length === 0) {
           response = `END You have no groups yet.\nDial again to join one.`;
         } else {
@@ -114,7 +124,7 @@ ${g.is_fully_funded === "True" ? "✓ Fully Funded!" : ""}`;
         response = `CON Enter your PIN to continue:`;
         session.pendingAction = "2";
       } else {
-        const groups = await apiGet("/groups/", session.token);
+        const groups = await apiGet("/groups/list/", session.token);
         if (!groups || groups.length === 0) {
           response = `END You have no groups to contribute to.`;
         } else {
@@ -163,7 +173,7 @@ Amount: KES ${amount.toLocaleString("en-KE")}
       if (last === "1") {
         try {
           await apiPost(
-            "/contributions/",
+            "/groups/contributions/",
             {
               group: session.contributeGroupId,
               amount: session.contributeAmount,
@@ -185,7 +195,7 @@ Amount: KES ${amount.toLocaleString("en-KE")}
         response = `CON Enter your PIN to continue:`;
         session.pendingAction = "3";
       } else {
-        const groups = await apiGet("/groups/", session.token);
+        const groups = await apiGet("/groups/list/", session.token);
         if (!groups || groups.length === 0) {
           response = `END You have no savings yet.`;
         } else {
@@ -209,17 +219,34 @@ Total: KES ${total.toLocaleString("en-KE")}`;
         response = `CON Enter your PIN to continue:`;
         session.pendingAction = "4";
       } else {
-        response = `CON Enter the Group ID to join:`;
+        // List all available groups so user can pick by number
+        const groups = await apiGet("/groups/list/", session.token);
+        if (!groups || groups.length === 0) {
+          response = `END No groups available to join.`;
+        } else {
+          session.allGroups = groups;
+          let menu = `CON Select a group to join:\n`;
+          groups.slice(0, 5).forEach((g, i) => {
+            menu += `${i + 1}. ${g.name} (${g.members_count || 0} members)\n`;
+          });
+          menu += `0. Back`;
+          response = menu;
+        }
       }
     }
 
-    else if (input[0] === "4" && step === 2) {
-      const groupId = parseInt(last);
-      if (isNaN(groupId)) {
-        response = `END Invalid Group ID.`;
+    else if (input[0] === "4" && step === 2 && last !== "0") {
+      const idx = parseInt(last) - 1;
+      const g = session.allGroups?.[idx];
+      if (!g) {
+        response = `END Invalid selection.`;
       } else {
-        session.joinGroupId = groupId;
-        response = `CON Confirm joining group ID ${groupId}?
+        session.joinGroupId = g.id;
+        session.joinGroupName = g.name;
+        response = `CON Join "${g.name}"?
+Members: ${g.members_count || 0}
+Target: KES ${parseFloat(g.target_amount || "0").toLocaleString("en-KE")}
+
 1. Yes, join
 2. Cancel`;
       }
@@ -228,14 +255,15 @@ Total: KES ${total.toLocaleString("en-KE")}`;
     else if (input[0] === "4" && step === 3) {
       if (last === "1") {
         try {
-          await apiPost(
-            `/groups/${session.joinGroupId}/join/`,
+          // PATCH the group to add current user as member
+          await axios.patch(
+            `${API_BASE}/groups/list/${session.joinGroupId}/`,
             {},
-            session.token,
+            { headers: { Authorization: `Bearer ${session.token}` } },
           );
-          response = `END ✓ You have successfully joined the group!`;
+          response = `END ✓ You have successfully joined "${session.joinGroupName}"!`;
         } catch {
-          response = `END ✗ Could not join group. It may not exist or you are already a member.`;
+          response = `END ✗ Could not join group. You may already be a member.`;
         }
       } else {
         response = `END Join cancelled.`;
@@ -248,11 +276,11 @@ Total: KES ${total.toLocaleString("en-KE")}`;
         response = `CON Enter your PIN to continue:`;
         session.pendingAction = "5";
       } else {
-        const profile = await apiGet("/auth/profile/", session.token);
+        // Profile data was stored at login time from the token response
         response = `END Your Profile:
-Name: ${profile.first_name} ${profile.last_name}
-Phone: ${profile.phone_number || phoneNumber}
-Email: ${profile.email || "N/A"}`;
+Name: ${session.firstName || "N/A"} ${session.lastName || ""}
+Phone: ${phoneNumber}
+Role: ${session.role || "N/A"}`;
       }
     }
 
@@ -271,11 +299,25 @@ Email: ${profile.email || "N/A"}`;
       const pin = last;
       // Authenticate using phone number + PIN as password
       try {
-        const data = await apiPost("/auth/token/", {
-          phone_number: phoneNumber,
+        const data = await apiPost("/token/", {
+          username: phoneNumber,
           password: pin,
         });
         session.token = data.access;
+        session.refreshToken = data.refresh;
+
+        // Decode JWT payload to get basic user info (no profile endpoint available)
+        try {
+          const payload = JSON.parse(
+            Buffer.from(data.access.split(".")[1], "base64").toString("utf8"),
+          );
+          session.firstName = payload.first_name || "";
+          session.lastName = payload.last_name || "";
+          session.role = payload.role || "";
+        } catch {
+          // JWT decode failed — profile fields just won't show
+        }
+
         session.pendingAction = null;
 
         // Redirect to original intended action

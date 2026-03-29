@@ -2,8 +2,7 @@
 
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { groupsApi, type ChamaGroup } from "@/lib/api";
-import { wholesalersApi } from "@/lib/api";
+import { groupsApi, wholesalersApi, type ChamaGroup } from "@/lib/api";
 import {
   Dialog,
   DialogContent,
@@ -70,13 +69,16 @@ function GroupForm({
           name,
           description,
           target_amount: targetAmount,
-          wholesaler: wholesalerId && wholesalerId !== "none" ? Number(wholesalerId) : undefined,
+          wholesaler:
+            wholesalerId && wholesalerId !== "none"
+              ? Number(wholesalerId)
+              : undefined,
         });
       }}
       className="space-y-5"
     >
       <div>
-        <label className="cc-label text-primary">Group Name</label>
+        <label className="cc-label">Group Name</label>
         <input
           value={name}
           onChange={(e) => setName(e.target.value)}
@@ -86,7 +88,7 @@ function GroupForm({
         />
       </div>
       <div>
-        <label className="cc-label text-primary">Description</label>
+        <label className="cc-label">Description</label>
         <textarea
           value={description}
           onChange={(e) => setDescription(e.target.value)}
@@ -96,7 +98,7 @@ function GroupForm({
         />
       </div>
       <div>
-        <label className="cc-label text-primary">Target Amount (KES)</label>
+        <label className="cc-label">Target Amount (KES)</label>
         <input
           type="number"
           step="0.01"
@@ -108,13 +110,13 @@ function GroupForm({
         />
       </div>
       <div>
-        <label className="cc-label text-primary">Wholesaler (optional)</label>
+        <label className="cc-label">Wholesaler (optional)</label>
         <Select
           value={wholesalerId}
           onValueChange={setWholesalerId}
           disabled={wLoading}
         >
-          <SelectTrigger className="cc-select text-primary">
+          <SelectTrigger className="cc-select">
             <SelectValue
               placeholder={
                 wLoading ? "Loading wholesalers..." : "Select a wholesaler"
@@ -125,7 +127,9 @@ function GroupForm({
             <SelectItem value="none">None</SelectItem>
             {wholesalers?.map((w) => (
               <SelectItem key={w.id} value={String(w.id)}>
-                {w.business_name || w.name}
+                {/* business_name first, then full name — no .name field in updated api.ts */}
+                {w.business_name ||
+                  `${w.first_name} ${w.last_name}`.trim()}
               </SelectItem>
             ))}
           </SelectContent>
@@ -243,11 +247,11 @@ export default function Groups() {
           <DialogContent className="p-0 border-0 bg-transparent shadow-none max-w-lg">
             <div className="cc-modal">
               <div className="flex items-center gap-3 mb-6">
-                <div className="w-10 h-10 rounded-xl bg-[var(--brand-tint)] border border-[var(--brand-border)] flex items-center justify-center text-primary">
-                  <Leaf className="w-5 h-5  text-primary" />
+                <div className="w-10 h-10 rounded-xl bg-[var(--brand-tint)] border border-[var(--brand-border)] flex items-center justify-center">
+                  <Leaf className="w-5 h-5 text-[var(--brand-light)]" />
                 </div>
                 <DialogHeader className="p-0">
-                  <DialogTitle className="cc-h3 p-0 text-primary">
+                  <DialogTitle className="cc-h3 p-0">
                     {editGroup ? "Edit Group" : "Create New Group"}
                   </DialogTitle>
                 </DialogHeader>

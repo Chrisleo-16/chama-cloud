@@ -6,9 +6,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ApiError } from "@/lib/api";
+import { ApiError, getUserFromToken } from "@/lib/api";
 import { Loader2, Phone, Lock, User, Sprout, Building } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+
+type Role = "MERCHANT" | "WHOLESALER";
 
 export default function Register() {
   const [form, setForm] = useState({
@@ -16,29 +18,59 @@ export default function Register() {
     first_name: "",
     last_name: "",
     password: "",
-    role: "MERCHANT" as "MERCHANT" | "WHOLESALER",
+    role: "MERCHANT" as Role,
     business_name: "",
     mpesa_shortcode: "",
     shortcode_type: "" as "" | "PAYBILL" | "TILL",
   });
+  
   const [loading, setLoading] = useState(false);
   const { register } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
 
-  const update = (field: string, value: string) => setForm((p) => ({ ...p, [field]: value }));
+  const update = (field: string, value: string) => 
+    setForm((p) => ({ ...p, [field]: value }));
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+
     try {
-      await register(form);
+      // 1. Logic: Clean the data so we don't send Wholesaler info for Merchants
+      const registrationData = {
+        phone_number: form.phone_number.trim(),
+        first_name: form.first_name.trim(),
+        last_name: form.last_name.trim(),
+        password: form.password,
+        role: form.role,
+        ...(form.role === "WHOLESALER" && {
+          business_name: form.business_name.trim(),
+          mpesa_shortcode: form.mpesa_shortcode.trim(),
+          shortcode_type: form.shortcode_type,
+        }),
+      };
+
+      // 2. Validation: Basic Kenyan Phone check (starts with 254 or 07/01)
+      if (!/^(?:254|\+254|0)?(7|1)\d{8}$/.test(registrationData.phone_number)) {
+        throw new Error("Please enter a valid Kenyan phone number.");
+      }
+
+      const resp = await register(registrationData);
+      
       toast({ title: "Account created!", description: "Welcome to Chama Cloud" });
-      navigate("/dashboard");
-    } catch (err) {
-      const message = err instanceof ApiError
-        ? "Registration failed. Check your details."
-        : "Something went wrong.";
+      
+      // Prefer token / response role from signup from backend, else form role fallback
+      const user = getUserFromToken();
+      const role = user?.role || (resp as any)?.role || form.role;
+      const destination = role === "WHOLESALER" ? "/wholesaler" : "/dashboard";
+      navigate(destination, { replace: true });
+      
+    } catch (err: any) {
+      const message = err instanceof ApiError 
+        ? err.message 
+        : err.message || "Something went wrong.";
+        
       toast({ title: "Error", description: message, variant: "destructive" });
     } finally {
       setLoading(false);
@@ -64,62 +96,107 @@ export default function Register() {
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-2">
-                  <Label>First Name</Label>
+                  <Label htmlFor="first_name">First Name</Label>
                   <div className="relative">
                     <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input placeholder="Jane" value={form.first_name} onChange={(e) => update("first_name", e.target.value)} className="pl-10" required />
+                    <Input 
+                      id="first_name"
+                      placeholder="Jane" 
+                      value={form.first_name} 
+                      onChange={(e) => update("first_name", e.target.value)} 
+                      className="pl-10" 
+                      required 
+                    />
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <Label>Last Name</Label>
-                  <Input placeholder="Mwangi" value={form.last_name} onChange={(e) => update("last_name", e.target.value)} required />
+                  <Label htmlFor="last_name">Last Name</Label>
+                  <Input 
+                    id="last_name"
+                    placeholder="Mwangi" 
+                    value={form.last_name} 
+                    onChange={(e) => update("last_name", e.target.value)} 
+                    required 
+                  />
                 </div>
               </div>
 
               <div className="space-y-2">
-                <Label>Phone Number</Label>
+                <Label htmlFor="phone">Phone Number</Label>
                 <div className="relative">
                   <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input placeholder="2547XXXXXXXX" value={form.phone_number} onChange={(e) => update("phone_number", e.target.value)} className="pl-10" required />
+                  <Input 
+                    id="phone"
+                    placeholder="2547XXXXXXXX" 
+                    value={form.phone_number} 
+                    onChange={(e) => update("phone_number", e.target.value)} 
+                    className="pl-10" 
+                    required 
+                  />
                 </div>
               </div>
 
               <div className="space-y-2">
-                <Label>Password</Label>
+                <Label htmlFor="password">Password</Label>
                 <div className="relative">
                   <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input type="password" placeholder="••••••••" value={form.password} onChange={(e) => update("password", e.target.value)} className="pl-10" required />
+                  <Input 
+                    id="password"
+                    type="password" 
+                    placeholder="••••••••" 
+                    value={form.password} 
+                    onChange={(e) => update("password", e.target.value)} 
+                    className="pl-10" 
+                    required 
+                  />
                 </div>
               </div>
 
               <div className="space-y-2">
-                <Label>Role</Label>
-                <Select value={form.role} onValueChange={(v) => update("role", v)}>
+                <Label>Account Type</Label>
+                <Select value={form.role} onValueChange={(v: Role) => update("role", v)}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="MERCHANT">Merchant</SelectItem>
-                    <SelectItem value="WHOLESALER">Wholesaler</SelectItem>
+                    <SelectItem value="MERCHANT">Merchant (Retailer)</SelectItem>
+                    <SelectItem value="WHOLESALER">Wholesaler (Supplier)</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
 
               {form.role === "WHOLESALER" && (
-                <>
+                <div className="space-y-4 pt-2 border-t border-dashed">
                   <div className="space-y-2">
-                    <Label>Business Name</Label>
+                    <Label htmlFor="business_name">Business Name</Label>
                     <div className="relative">
                       <Building className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                      <Input placeholder="Your business" value={form.business_name} onChange={(e) => update("business_name", e.target.value)} className="pl-10" />
+                      <Input 
+                        id="business_name"
+                        placeholder="e.g. Mwangi Wholesale Ltd" 
+                        value={form.business_name} 
+                        onChange={(e) => update("business_name", e.target.value)} 
+                        className="pl-10" 
+                        required={form.role === "WHOLESALER"}
+                      />
                     </div>
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-2">
-                      <Label>M-Pesa Shortcode</Label>
-                      <Input placeholder="123456" value={form.mpesa_shortcode} onChange={(e) => update("mpesa_shortcode", e.target.value)} />
+                      <Label htmlFor="shortcode">M-Pesa Shortcode</Label>
+                      <Input 
+                        id="shortcode"
+                        placeholder="123456" 
+                        value={form.mpesa_shortcode} 
+                        onChange={(e) => update("mpesa_shortcode", e.target.value)} 
+                        required={form.role === "WHOLESALER"}
+                      />
                     </div>
                     <div className="space-y-2">
-                      <Label>Shortcode Type</Label>
-                      <Select value={form.shortcode_type} onValueChange={(v) => update("shortcode_type", v)}>
+                      <Label>Type</Label>
+                      <Select 
+                        value={form.shortcode_type} 
+                        onValueChange={(v) => update("shortcode_type", v)}
+                        required={form.role === "WHOLESALER"}
+                      >
                         <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
                         <SelectContent>
                           <SelectItem value="PAYBILL">Paybill</SelectItem>
@@ -128,12 +205,18 @@ export default function Register() {
                       </Select>
                     </div>
                   </div>
-                </>
+                </div>
               )}
 
-              <Button type="submit" className="w-full cc-btn-primary" disabled={loading}>
-                {loading && <Loader2 className="h-4 w-4 animate-spin" />}
-                Create account
+              <Button type="submit" className="w-full mt-4" disabled={loading}>
+                {loading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Creating account...
+                  </>
+                ) : (
+                  "Create account"
+                )}
               </Button>
             </form>
 

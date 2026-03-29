@@ -1,6 +1,9 @@
-import { LayoutDashboard, Users, Coins, CreditCard, Sprout, Ticket} from "lucide-react";
-import { NavLink } from "@/components/NavLink";
-import { useLocation } from "react-router-dom";
+import { 
+  LayoutDashboard, Users, Coins, CreditCard, 
+  Sprout, Ticket, Package, Store, ClipboardList 
+} from "lucide-react";
+import { NavLink, useLocation } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
 import {
   Sidebar,
   SidebarContent,
@@ -14,40 +17,61 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 
-const items = [
-  { title: "Overview", url: "/dashboard", icon: LayoutDashboard },
-  { title: "Groups", url: "/dashboard/groups", icon: Users },
-  { title: "Contributions", url: "/dashboard/contributions", icon: Coins },
-  { title: "Payments", url: "/dashboard/payments", icon: CreditCard },
-  { title: "Vouchers", url: "/dashboard/vouchers", icon: Ticket },
+// Define menu structure with role access
+const menuItems = [
+  { title: "Overview", url: "/dashboard", icon: LayoutDashboard, roles: ["MERCHANT", "WHOLESALER"] },
+  { title: "Groups", url: "/dashboard/groups", icon: Users, roles: ["MERCHANT"] },
+  { title: "Contributions", url: "/dashboard/contributions", icon: Coins, roles: ["MERCHANT"] },
+  { title: "Inventory", url: "/dashboard/inventory", icon: Package, roles: ["WHOLESALER"] },
+  { title: "Sales", url: "/dashboard/sales", icon: ClipboardList, roles: ["WHOLESALER"] },
+  { title: "Merchants", url: "/dashboard/merchants", icon: Store, roles: ["WHOLESALER"] },
+  { title: "Payments", url: "/dashboard/payments", icon: CreditCard, roles: ["MERCHANT", "WHOLESALER"] },
+  { title: "Vouchers", url: "/dashboard/vouchers", icon: Ticket, roles: ["MERCHANT"] },
 ];
 
 export function AppSidebar() {
+  const { userRole, profile } = useAuth(); // profile usually contains the decoded token data
   const { state } = useSidebar();
-  const collapsed = state === "collapsed";
   const location = useLocation();
-  const isActive = (path: string) =>
-    path === "/dashboard" ? location.pathname === path : location.pathname.startsWith(path);
+  const collapsed = state === "collapsed";
+
+  // DEBUG: Check your console to see what this says!
+  console.log("Current Sidebar Role:", userRole);
+
+  // Filter items. We'll add a fallback so you can at least see "Overview" while debugging.
+  const filteredItems = menuItems.filter(item => {
+    // If userRole is missing, we check if the item is a 'common' item (Overview/Payments)
+    if (!userRole) return item.url === "/dashboard"; 
+    
+    // Otherwise, check if the role (forced to uppercase) matches
+    return item.roles.includes(userRole.toUpperCase());
+  });
 
   return (
     <Sidebar collapsible="icon">
-      <SidebarHeader className="p-4">
-        <div className="flex items-center gap-2">
-          <Sprout className="h-6 w-6 text-primary shrink-0" />
-          {!collapsed && <span className="font-display font-bold text-lg text-foreground">Chama Cloud</span>}
+      <SidebarHeader className="p-4 border-b border-border/50">
+        <div className="flex items-center gap-3">
+          <div className="bg-primary/10 p-1.5 rounded-lg">
+            <Sprout className="h-6 w-6 text-primary shrink-0" />
+          </div>
+          {!collapsed && <span className="font-display font-bold text-lg">Chama Cloud</span>}
         </div>
       </SidebarHeader>
+
       <SidebarContent>
         <SidebarGroup>
-          <SidebarGroupLabel>Dashboard</SidebarGroupLabel>
+          <SidebarGroupLabel className="px-4">
+            {/* If userRole is null, this will still show "Merchant Menu" */}
+            {userRole === "WHOLESALER" ? "Wholesaler Menu" : "Merchant Menu"}
+          </SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {items.map((item) => (
+              {filteredItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild isActive={isActive(item.url)}>
-                    <NavLink to={item.url} end={item.url === "/dashboard"} className="hover:bg-muted/50" activeClassName="bg-primary/10 text-primary font-medium">
-                      <item.icon className="mr-2 h-4 w-4" />
-                      {!collapsed && <span>{item.title}</span>}
+                  <SidebarMenuButton asChild isActive={location.pathname === item.url}>
+                    <NavLink to={item.url} className="flex items-center w-full">
+                      <item.icon className="h-4 w-4 shrink-0" />
+                      {!collapsed && <span className="ml-3 font-medium">{item.title}</span>}
                     </NavLink>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
