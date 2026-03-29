@@ -21,10 +21,9 @@ Chama-Cloud bridges the gap between digital savings and physical fulfillment.
 
 ## 🚀 Live Demo & Links
 
-* **Live Web App (Frontend):** [Insert your Vercel URL here]
+* **Live Web App (Frontend):** `https://chama-cloud.vercel.app/`
 * **Live API (Backend):** `https://chama-cloud-api.onrender.com`
-* **Video Pitch & Demo:** [Insert YouTube/Google Drive Link Here]
-
+* **Video Pitch & Demo:** `https://drive.google.com/file/d/1njufDrRzk_M1g_-l8qLR58QeAie5GdUn/view?usp=sharing`
 ---
 
 ## 🔑 Test Accounts
