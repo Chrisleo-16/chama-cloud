@@ -1,6 +1,7 @@
 from django.db import models
 from django.conf import settings
 from django.db.models import Sum
+import uuid
 
 class ChamaGroup(models.Model):
     name = models.CharField(max_length=255, help_text="e.g., Umoja Onion Traders")
@@ -58,4 +59,36 @@ class Contribution(models.Model):
         ).aggregate(Sum('amount'))['amount__sum'] or 0.00
         
         self.group.current_amount = completed_total
+        if self.group.is_fully_funded and not self.group.vouchers.exists():
+            # If the group just hit 100%, generate a voucher for every merchant who paid
+            # We find all unique merchants who contributed
+            from django.db.models import Sum
+            
+            merchants = self.group.contributions.filter(status='COMPLETED').values('merchant').annotate(total_paid=Sum('amount'))
+            
+            from .models import ClaimVoucher
+            for m in merchants:
+                ClaimVoucher.objects.create(
+                    group=self.group,
+                    merchant_id=m['merchant'],
+                    amount_paid=m['total_paid']
+                )
+                
         self.group.save()
+
+class ClaimVoucher(models.Model):
+    # This ID will be the data embedded inside the QR Code
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    
+    merchant = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='vouchers')
+    group = models.ForeignKey(ChamaGroup, on_delete=models.CASCADE, related_name='vouchers')
+    
+    # We aggregate their total contribution so the wholesaler knows how much to give them
+    amount_paid = models.DecimalField(max_digits=10, decimal_places=2)
+    is_claimed = models.BooleanField(default=False)
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    claimed_at = models.DateTimeField(blank=True, null=True)
+
+    def __str__(self):
+        return f"Voucher for {self.merchant.username} - {self.group.name}"
