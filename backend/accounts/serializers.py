@@ -7,11 +7,18 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = ['phone_number', 'first_name', 'last_name', 'password', 'role', 'business_name', 'mpesa_shortcode', 'shortcode_type']
+        fields = [
+            'phone_number', 'first_name', 'last_name', 'password', 'role', 
+            'business_name', 'mpesa_shortcode', 'shortcode_type',
+            # --- NEW KYC & STOREFRONT FIELDS ---
+            'business_address', 'business_category', 
+            'business_registration_number', 'kra_pin'
+        ]
 
     def create(self, validated_data):
         role = validated_data.get('role', User.MERCHANT)
 
+        # Your excellent custom validation check!
         if role == User.WHOLESALER and not validated_data.get('mpesa_shortcode'):
             raise serializers.ValidationError({"mpesa_shortcode": "Wholesalers must provide a Paybill or Till number."})
 
@@ -23,7 +30,11 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
             role=role,
             business_name=validated_data.get('business_name', ""),
             mpesa_shortcode=validated_data.get('mpesa_shortcode', None),
-            shortcode_type=validated_data.get('shortcode_type', None)
+            shortcode_type=validated_data.get('shortcode_type', None),
+            business_address=validated_data.get('business_address', ""),
+            business_category=validated_data.get('business_category', ""),
+            business_registration_number=validated_data.get('business_registration_number', ""),
+            kra_pin=validated_data.get('kra_pin', "")
         )
         return user
 
