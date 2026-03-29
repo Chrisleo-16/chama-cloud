@@ -2,7 +2,8 @@ from rest_framework import generics, status
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from .models import User
-from .serializers import UserRegistrationSerializer, WholesalerSerializer
+from .serializers import UserRegistrationSerializer, WholesalerSerializer, CustomTokenObtainPairSerializer
+from rest_framework_simplejwt.views import TokenObtainPairView
 
 class RegisterView(generics.CreateAPIView):
     serializer_class = UserRegistrationSerializer
@@ -26,3 +27,6 @@ class VerifiedWholesalersListView(generics.ListAPIView):
     def get_queryset(self):
         # Only return Wholesalers who have been vetted by the admin
         return User.objects.filter(role=User.WHOLESALER, is_verified_wholesaler=True)
+
+class CustomTokenObtainPairView(TokenObtainPairView):
+    serializer_class = CustomTokenObtainPairSerializer

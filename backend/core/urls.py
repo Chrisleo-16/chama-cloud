@@ -1,18 +1,10 @@
 from django.contrib import admin
 from django.urls import path, include
-from rest_framework_simplejwt.views import TokenRefreshView
-from rest_framework.views import APIView
-from rest_framework.response import Response
-from accounts.jwt_serializers import CustomTokenObtainPairSerializer
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 from django.http import HttpResponse
 from django.contrib.auth import get_user_model
-
-class CustomTokenObtainPairView(APIView):
-    def post(self, request):
-        serializer = CustomTokenObtainPairSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        return Response(serializer.validated_data)
+from accounts.views import CustomTokenObtainPairView
+from rest_framework_simplejwt.views import TokenRefreshView
 
 def setup_admin(request):
     User = get_user_model()

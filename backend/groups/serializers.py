@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import ChamaGroup, Contribution
+from .models import ChamaGroup, Contribution, ClaimVoucher
 
 class ContributionSerializer(serializers.ModelSerializer):
     # grabs the user's real name 
@@ -31,3 +31,20 @@ class ChamaGroupSerializer(serializers.ModelSerializer):
             percentage = (current / target) * 100
             return round(percentage, 1)
         return 0
+
+class ClaimVoucherSerializer(serializers.ModelSerializer):
+    # Pulling nested data to make the frontend's life easier
+    group_name = serializers.CharField(source='group.name', read_only=True)
+    wholesaler_name = serializers.CharField(source='group.wholesaler.business_name', read_only=True)
+
+    class Meta:
+        model = ClaimVoucher
+        fields = [
+            'id', 
+            'group_name', 
+            'wholesaler_name', 
+            'amount_paid', 
+            'is_claimed', 
+            'created_at', 
+            'claimed_at'
+        ]
