@@ -54,7 +54,7 @@ To fully experience our multi-role routing and authorization system, please use 
 
 | Merchant Dashboard | M-Pesa Integration | Wholesaler QR Scanner |
 | :---: | :---: | :---: |
-| ![Merchant View](assets/MerchantView.jpg) | ![M-Pesa Prompt](access/M-Pesa.jpg) | ![QR Scanner](assets/QRScan.jpg) |
+| ![Merchant View](assets/MerchantView.jpg) | ![M-Pesa Prompt](assets/M-Pesa.jpg) | ![QR Scanner](assets/QRScan.jpg) |
 
 ---
 
