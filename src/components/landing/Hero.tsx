@@ -2,8 +2,17 @@ import { motion } from "framer-motion";
 import { Play } from "lucide-react";
 import heroImg from "@/assets/hero-illustration.jpg";
 import { Link } from "react-router-dom";
+import { useState } from "react";
+import {
+  Dialog,
+  DialogContent,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 
-const Hero = () => (
+const Hero = () => {
+  const [isVideoOpen, setIsVideoOpen] = useState(false);
+
+  return (
   <section className="relative overflow-hidden pt-28 pb-16 md:pt-36 md:pb-24">
     {/* Background decoration */}
     <div className="absolute inset-0 -z-10">
@@ -32,9 +41,24 @@ const Hero = () => (
           <button className="cc-btn-primary text-base px-8 py-3.5">
             <Link to="/register">Start a free trial</Link>
           </button>
-          <button className="cc-btn-outline text-base px-8 py-3.5">
-            <Play className="h-4 w-4" /> Watch demo
-          </button>
+          <Dialog open={isVideoOpen} onOpenChange={setIsVideoOpen}>
+            <DialogTrigger asChild>
+              <button className="cc-btn-outline text-base px-8 py-3.5">
+                <Play className="h-4 w-4" /> Watch demo
+              </button>
+            </DialogTrigger>
+            <DialogContent className="max-w-4xl w-full">
+              <video
+                controls
+                autoPlay
+                className="w-full rounded-lg"
+                onLoadedData={() => setIsVideoOpen(true)}
+              >
+                <source src="/ChamaCloud_ Step-by-Step Guide_720p_caption.mp4" type="video/mp4" />
+                Your browser does not support the video tag.
+              </video>
+            </DialogContent>
+          </Dialog>
         </div>
       </motion.div>
 
@@ -57,6 +81,7 @@ const Hero = () => (
       </motion.div>
     </div>
   </section>
-);
+  );
+};
 
 export default Hero;
