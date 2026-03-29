@@ -82,8 +82,15 @@ class MpesaCallbackView(views.APIView):
 
         try:
             # Find the pending contribution
-            contribution = Contribution.objects.get(checkout_request_id=checkout_request_id)
+            contribution = Contribution.objects.filter(
+                checkout_request_id=checkout_request_id,
+                status='PENDING'
+            ).last()
             
+            if not contribution:
+                logger.error(f"No pending contribution found for RequestID: {checkout_request_id}")
+                return Response({"ResultCode": 0, "ResultDesc": "Accepted"}, status=status.HTTP_200_OK)
+
             if result_code == 0:
                 # Payment was successful!
                 callback_metadata = stk_callback.get('CallbackMetadata', {}).get('Item', [])
@@ -91,14 +98,13 @@ class MpesaCallbackView(views.APIView):
                 
                 contribution.status = 'COMPLETED'
                 contribution.mpesa_receipt_number = receipt_number
-                contribution.save() 
+                contribution.save() # This triggers the group total update!
             else:
-                # Payment failed or was cancelled by user
+                # Payment failed or was cancelled
                 contribution.status = 'FAILED'
                 contribution.save()
 
-        except Contribution.DoesNotExist:
-            logger.error(f"Contribution with CheckoutRequestID {checkout_request_id} not found.")
-        
+        except Exception as e:
+            logger.error(f"Callback processing error: {str(e)}")
         # Always return success to Safaricom so they stop retrying
         return Response({"ResultCode": 0, "ResultDesc": "Accepted"}, status=status.HTTP_200_OK)
