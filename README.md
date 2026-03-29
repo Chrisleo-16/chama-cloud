@@ -113,3 +113,54 @@ source .venv/bin/activate  # On Windows use: .venv\Scripts\activate
 
 # Install dependencies
 pip install -r requirements.txt
+
+```
+#### Environment Variables (`.env`)
+Create a `.env` file in the root of the `backend` directory and add the following required variables:
+
+```env
+# --- .env.example ---
+SECRET_KEY=your_django_secret_key_here
+DEBUG=True
+DATABASE_URL=postgres://user:password@host:port/dbname
+
+# Safaricom Daraja API Credentials (Sandbox)
+MPESA_CONSUMER_KEY=your_daraja_consumer_key
+MPESA_CONSUMER_SECRET=your_daraja_consumer_secret
+MPESA_SHORTCODE=174379
+MPESA_PASSKEY=your_daraja_passkey
+```
+
+#### Run the Server
+```bash
+# Apply database migrations
+python manage.py migrate
+
+# Create a local superuser
+python manage.py createsuperuser
+
+# Start the development server
+python manage.py runserver
+```
+#### 2. Frontend Setup(React)
+```bash
+cd chama-cloud/frontend
+
+# Install dependencies
+npm install
+
+# Start the React development server
+npm start
+```
+#### 👥 Team Collaborators
+
+Roney Baraka - Backend Architecture
+
+Chrisben Evans - Frontend Development 
+
+Vivian Chebii- UI/UX
+
+Joshua Gichuki - QA/Testing
+ 
+Victor Mongare - Backend Architecture
+
