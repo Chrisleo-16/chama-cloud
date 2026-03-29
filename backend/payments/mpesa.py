@@ -14,15 +14,29 @@ class MpesaGateWay:
         self.stk_push_url = 'https://sandbox.safaricom.co.ke/mpesa/stkpush/v1/processrequest'
 
     def get_access_token(self):
+        if not self.consumer_key or not self.consumer_secret:
+            raise Exception("CRITICAL: M-Pesa Keys are EMPTY! Render is not reading your Environment Variables.")
+
         try:
+            import base64
+            api_credentials = f"{self.consumer_key}:{self.consumer_secret}"
+            encoded_credentials = base64.b64encode(api_credentials.encode('utf-8')).decode('utf-8')
+            
+            headers = {
+                'Authorization': f'Basic {encoded_credentials}'
+            }
+
+            
             res = requests.get(
                 self.auth_url, 
-                auth=(self.consumer_key, self.consumer_secret), 
+                headers=headers, 
                 timeout=10
             )
+            
             if res.status_code == 200:
                 return res.json()['access_token']
             else:
+                
                 raise Exception(f"Safaricom Error {res.status_code}: {res.text}")
         except Exception as e:
             raise Exception(f"Failed to get access token: {str(e)}")
