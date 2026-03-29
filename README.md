@@ -1,3 +1,115 @@
-# Welcome to your Lovable project
+# ☁️ Chama-Cloud
 
-TODO: Document your project here
+**Money in Motion Hackathon Submission**
+
+Chama-Cloud is a transparent, two-sided FinTech marketplace designed to revolutionize how investment groups (Chamas) manage funds and procure bulk goods securely using M-Pesa and Cryptographic QR Vouchers.
+
+---
+
+## 📖 About The Project
+
+### The Problem
+Traditional Chamas (investment groups) struggle with transparent fund management and secure physical procurement. When a Chama raises money to buy bulk goods from a wholesaler, the process relies on manual cash handling, is highly prone to fraud, and lacks a verified digital trail connecting the funds raised to the inventory dispensed.
+
+### The Solution
+Chama-Cloud bridges the gap between digital savings and physical fulfillment. 
+* **For Merchants:** Group members can seamlessly contribute to their specific Chama goals via automated **M-Pesa STK Pushes**. 
+* **The Magic:** Once a Chama's target goal hits 100%, the platform automatically generates a secure, UUID-backed **QR-code voucher**. 
+* **For Wholesalers:** Vetted wholesalers use our dedicated dashboard to scan these merchant vouchers in-store, instantly verifying the funds and safely dispensing the exact goods without cash ever changing hands.
+
+---
+
+## 🚀 Live Demo & Links
+
+* **Live Web App (Frontend):** [Insert your Vercel URL here]
+* **Live API (Backend):** `https://chama-cloud-api.onrender.com`
+* **Video Pitch & Demo:** [Insert YouTube/Google Drive Link Here]
+
+---
+
+## 🔑 Test Accounts (For Judges/Reviewers)
+
+To fully experience our multi-role routing and authorization system, please use the following credentials on the live site:
+
+### 1. The Admin (Superuser)
+* **Phone:** `0711111111`
+* **Password:** `password123`
+* **Access:** Navigate to `https://chama-cloud-api.onrender.com/admin/` to verify Wholesaler KYC documents.
+
+### 2. The Wholesaler
+* **Phone:** `0721211010`
+* **Password:** `Muganda_001`
+* **Access:** Logs into the main app and is routed to the Wholesaler Dashboard to view pending Chama pipelines, the voucher ledger, and access the QR Scanner.
+
+### 3. The Merchant (Chama Member)
+* **Phone:** `0745366650`
+* **Password:** `Muganda_001`
+* **Access:** Logs into the main app to view groups, make live STK Push contributions, and view their generated QR claim vouchers.
+
+---
+
+## 📸 Screenshots
+
+*(Replace the placeholder links with actual images from your `assets/` folder once uploaded)*
+
+| Merchant Dashboard | M-Pesa Integration | Wholesaler QR Scanner |
+| :---: | :---: | :---: |
+| ![Merchant View](path/to/merchant-screenshot.png) | ![M-Pesa Prompt](path/to/mpesa-screenshot.png) | ![QR Scanner](path/to/scanner-screenshot.png) |
+
+---
+
+## ✨ Key Features
+
+* **Role-Based Routing:** Custom JWT authentication instantly routes Admins, Wholesalers, and Merchants to their distinct dashboards upon login.
+* **Automated Payments:** Live integration with the Safaricom Daraja API (M-Pesa Express/STK Push).
+* **Automated Reconciliation:** M-Pesa Callback webhooks instantly update group funding progress in real-time. No manual data entry.
+* **Secure Fulfillment:** Cryptographic UUID-based QR Code generation triggers the second a Chama hits 100% funding.
+* **In-App Scanner:** Wholesalers can use their device camera to scan and mark orders as claimed, preventing double-dipping fraud.
+* **Wholesaler KYC:** Built-in verification toggles to ensure Chamas only deal with legally vetted, legitimate businesses.
+
+---
+
+## 🛠️ Built With (Tech Stack)
+
+**Frontend:**
+* React.js
+* TailwindCSS
+* React Router DOM
+* QR Code libraries (`qrcode.react` / `html5-qrcode`)
+* Hosted on Vercel
+
+**Backend:**
+* Python & Django
+* Django REST Framework (DRF)
+* SimpleJWT (Authentication)
+* PostgreSQL (Hosted on Neon)
+* Hosted on Render
+
+**External APIs & Tools:**
+* Safaricom Daraja API (B2C & M-Pesa Express)
+* Swagger/OpenAPI (API Documentation)
+
+---
+
+## 💻 Local Setup & Installation
+
+Follow these steps to run the complete environment on your local machine.
+
+### Prerequisites
+* Python 3.12+
+* Node.js & npm
+* PostgreSQL
+
+### 1. Backend Setup (Django)
+
+```bash
+# Clone the repository
+git clone [Insert Repository Link]
+cd chama-cloud/backend
+
+# Create and activate a virtual environment
+python -m venv .venv
+source .venv/bin/activate  # On Windows use: .venv\Scripts\activate
+
+# Install dependencies
+pip install -r requirements.txt
