@@ -1,4 +1,5 @@
 import { motion } from "framer-motion";
+import { Link } from "react-router-dom";
 
 const CTA = () => (
   <section className="cc-section">
@@ -21,7 +22,7 @@ const CTA = () => (
           No credit card required. Free for 30 days.
         </p>
         <button className="inline-flex items-center justify-center gap-2 rounded-[var(--radius)] bg-primary-foreground text-primary px-8 py-3.5 font-semibold text-base transition-all duration-200 hover:shadow-lg hover:scale-[1.02] active:scale-[0.98]">
-          Start your free trial
+          <Link to="/register">Start your free trial</Link>
         </button>
         <p className="text-primary-foreground/60 text-sm mt-4">No commitment, cancel anytime.</p>
       </div>

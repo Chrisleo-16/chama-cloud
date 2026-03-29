@@ -86,14 +86,14 @@ export default function Contributions() {
             <DialogContent className="p-0 border-0 bg-transparent shadow-none max-w-md">
               <div className="cc-modal">
                 <div className="flex items-center gap-3 mb-6">
-                  <div className="w-10 h-10 rounded-xl bg-[var(--brand-tint)] border border-[var(--brand-border)] flex items-center justify-center">
-                    <Coins className="w-5 h-5 text-[var(--brand-light)]" />
+                  <div className="w-10 h-10 rounded-xl bg-[var(--brand-tint)] border border-[var(--brand-border)] flex items-center justify-center text-primary">
+                    <Coins className="w-5 h-5  text-primary" />
                   </div>
-                  <DialogHeader className="p-0"><DialogTitle className="cc-h3 p-0">New Contribution</DialogTitle></DialogHeader>
+                  <DialogHeader className="p-0"><DialogTitle className="cc-h3 p-0 text-primary">New Contribution</DialogTitle></DialogHeader>
                 </div>
                 <form onSubmit={e => { e.preventDefault(); createMut.mutate({ group: parseInt(groupId), amount }); }} className="space-y-5">
                   <div>
-                    <label className="cc-label">Group</label>
+                    <label className="cc-label text-primary">Group</label>
                     <Select value={groupId} onValueChange={setGroupId}>
                       <SelectTrigger className="cc-input text-left flex items-center justify-between">
                         <SelectValue placeholder="Select a group" />
@@ -104,7 +104,7 @@ export default function Contributions() {
                     </Select>
                   </div>
                   <div>
-                    <label className="cc-label">Amount (KES)</label>
+                    <label className="cc-label text-primary">Amount (KES)</label>
                     <input type="number" step="0.01" value={amount} onChange={e => setAmount(e.target.value)} placeholder="5,000" required className="cc-input" />
                   </div>
                   <button type="submit" className="cc-btn-primary w-full" disabled={createMut.isPending || !groupId}>

@@ -1,5 +1,6 @@
 import { motion } from "framer-motion";
 import { Check } from "lucide-react";
+import { Link } from "react-router-dom";
 
 const plans = [
   {
@@ -75,7 +76,9 @@ const Pricing = () => (
             ))}
           </ul>
           <button className={plan.popular ? "cc-btn-primary w-full" : "cc-btn-outline w-full"}>
+            <Link to='/register'>
             {plan.price === "Custom" ? "Contact sales" : "Get started"}
+            </Link>
           </button>
         </motion.div>
       ))}

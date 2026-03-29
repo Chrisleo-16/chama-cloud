@@ -1,6 +1,7 @@
 import { motion } from "framer-motion";
 import { Play } from "lucide-react";
 import heroImg from "@/assets/hero-illustration.jpg";
+import { Link } from "react-router-dom";
 
 const Hero = () => (
   <section className="relative overflow-hidden pt-28 pb-16 md:pt-36 md:pb-24">
@@ -28,7 +29,9 @@ const Hero = () => (
           Digital records, instant statements, and full member transparency — all in one platform designed for the way your chama works.
         </p>
         <div className="flex flex-col sm:flex-row items-center gap-4 justify-center lg:justify-start">
-          <button className="cc-btn-primary text-base px-8 py-3.5">Start a free trial</button>
+          <button className="cc-btn-primary text-base px-8 py-3.5">
+            <Link to="/register">Start a free trial</Link>
+          </button>
           <button className="cc-btn-outline text-base px-8 py-3.5">
             <Play className="h-4 w-4" /> Watch demo
           </button>

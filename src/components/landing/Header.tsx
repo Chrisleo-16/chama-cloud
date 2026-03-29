@@ -37,7 +37,9 @@ const Header = () => {
           <button className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
             <Link to="/login">Log in</Link>
           </button>
-          <button className="cc-btn-primary text-sm px-4 py-2">Get started</button>
+          <button className="cc-btn-primary text-sm px-4 py-2">
+            <Link to="/register">Get started</Link>
+          </button>
         </div>
 
         <button className="md:hidden text-foreground" onClick={() => setOpen(!open)}>
@@ -64,8 +66,16 @@ const Header = () => {
                 </button>
               ))}
               <div className="pt-3 border-t border-border space-y-2">
-                <button className="block w-full text-left text-sm font-medium text-muted-foreground">Log in</button>
-                <button className="cc-btn-primary w-full text-sm">Get started</button>
+                <button className="block w-full text-left text-sm font-medium text-muted-foreground">
+                  <Link to="/login">
+                  Log in
+                  </Link>
+                  </button>
+                <button className="cc-btn-primary w-full text-sm">
+                  <Link to="/register">
+                    Get started
+                  </Link>
+                </button>
               </div>
             </div>
           </motion.div>

@@ -302,3 +302,16 @@ export const userApi = {
     }
   }
 };
+// --- Wholesalers ---
+export interface Wholesaler {
+  id: number;
+  name: string;
+  business_name?: string;
+  phone_number?: string;
+  email?: string;
+  // ... other fields returned by the API
+}
+
+export const wholesalersApi = {
+  list: () => apiFetch<Wholesaler[]>("/auth/wholesalers/"),
+};
