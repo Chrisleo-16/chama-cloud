@@ -1,5 +1,6 @@
 from rest_framework import serializers
 from .models import User
+from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 
 class UserRegistrationSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True)
@@ -30,3 +31,18 @@ class WholesalerSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = ['id', 'business_name', 'first_name', 'last_name', 'is_verified_wholesaler']
+
+class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
+    def validate(self, attrs):
+        # Get the standard access and refresh tokens
+        data = super().validate(attrs)
+        
+        # Inject the user's specific data into the response
+        data['role'] = self.user.role
+        data['first_name'] = self.user.first_name
+        
+        # If they are a wholesaler, let the frontend know if they are verified yet
+        if self.user.role == 'WHOLESALER':
+            data['is_verified_wholesaler'] = self.user.is_verified_wholesaler
+            
+        return data
