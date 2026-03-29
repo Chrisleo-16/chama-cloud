@@ -24,7 +24,10 @@ class ChamaGroupSerializer(serializers.ModelSerializer):
 
     # Calculate the percentage for the React progress bars
     def get_progress_percentage(self, obj):
-        if obj.target_amount > 0:
-            percentage = (obj.current_amount / obj.target_amount) * 100
+        target = float(obj.target_amount)
+        current = float(obj.current_amount)
+        
+        if target > 0:
+            percentage = (current / target) * 100
             return round(percentage, 1)
         return 0
