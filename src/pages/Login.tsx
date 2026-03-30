@@ -23,8 +23,16 @@ export default function Login() {
     try {
       const loginData = await login(phone, password);
       const user = getUserFromToken();
+      
       const role = user?.role || (loginData as any)?.role || "MERCHANT";
-      const destination = role === "WHOLESALER" ? "/wholesaler" : "/dashboard";
+      
+      let destination = "/dashboard";
+      if (role === "ADMIN") {
+        destination = "/admin";
+      } else if (role === "WHOLESALER") {
+        destination = "/wholesaler";
+      }
+
       navigate(destination, { replace: true });
     } catch (err) {
       const message = err instanceof ApiError
@@ -85,7 +93,7 @@ export default function Login() {
               </div>
 
               <Button type="submit" className="w-full cc-btn-primary" disabled={loading}>
-                {loading && <Loader2 className="h-4 w-4 animate-spin" />}
+                {loading && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
                 Sign in
               </Button>
             </form>

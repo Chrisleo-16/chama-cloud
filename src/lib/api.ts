@@ -1,14 +1,10 @@
 const API_BASE = "https://chama-cloud-api.onrender.com/api";
 
 // ==================== Types ====================
+
 export interface TokenPair {
   access: string;
   refresh: string;
-  role?: string;
-  first_name?: string;
-  last_name?: string;
-  phone_number?: string;
-  business_name?: string;
 }
 
 export interface UserRegistration {
@@ -27,8 +23,10 @@ export interface UserProfile {
   first_name: string;
   last_name: string;
   phone_number: string;
-  role: "MERCHANT" | "WHOLESALER";
+  role: "MERCHANT" | "WHOLESALER" | "ADMIN";
   business_name?: string;
+  business_address?: string;
+  business_category?: string;
   is_verified_wholesaler?: boolean;
 }
 
@@ -67,7 +65,18 @@ export interface Wholesaler {
   is_verified_wholesaler?: boolean;
 }
 
-// Returned by GET /api/groups/wholesaler/vouchers/
+// GET /api/groups/vouchers/ — merchant's own vouchers
+export interface MerchantVoucher {
+  id: string;           // UUID
+  group_name: string;
+  wholesaler_name: string;
+  amount_paid: string;
+  is_claimed: boolean;
+  created_at: string;
+  claimed_at: string | null;
+}
+
+// GET /api/groups/wholesaler/vouchers/ — wholesaler's vouchers to fulfil
 export interface Voucher {
   id: string;           // UUID
   group_name: string;
@@ -98,7 +107,29 @@ export interface Activity {
   type: "deposit" | "withdrawal";
 }
 
+// ── Credit Engine types (client-side computed) ───────────────────────────────
+export interface CreditScore {
+  score: number;           // 0–100
+  grade: "A" | "B" | "C" | "D" | "F";
+  eligible: boolean;
+  maxLoan: number;         // KES
+  reasons: string[];
+  recommendations: string[];
+}
+
+export interface GroupCreditScore {
+  groupId: number;
+  groupName: string;
+  score: number;
+  grade: "A" | "B" | "C" | "D" | "F";
+  eligible: boolean;
+  fundingGap: number;
+  maxGroupLoan: number;
+  reasons: string[];
+}
+
 // ==================== Token management ====================
+
 function getTokens(): TokenPair | null {
   const access = localStorage.getItem("cc_access");
   const refresh = localStorage.getItem("cc_refresh");
@@ -108,25 +139,15 @@ function getTokens(): TokenPair | null {
 function setTokens(tokens: TokenPair) {
   localStorage.setItem("cc_access", tokens.access);
   localStorage.setItem("cc_refresh", tokens.refresh);
-
-  if (tokens.role) localStorage.setItem("cc_role", tokens.role);
-  if (tokens.first_name) localStorage.setItem("cc_first_name", tokens.first_name);
-  if (tokens.last_name) localStorage.setItem("cc_last_name", tokens.last_name);
-  if (tokens.phone_number) localStorage.setItem("cc_phone_number", tokens.phone_number);
-  if (tokens.business_name) localStorage.setItem("cc_business_name", tokens.business_name);
 }
 
 export function clearTokens() {
   localStorage.removeItem("cc_access");
   localStorage.removeItem("cc_refresh");
-  localStorage.removeItem("cc_role");
-  localStorage.removeItem("cc_first_name");
-  localStorage.removeItem("cc_last_name");
-  localStorage.removeItem("cc_phone_number");
-  localStorage.removeItem("cc_business_name");
 }
 
 // ==================== JWT helpers ====================
+
 function decodeToken(token: string): Record<string, unknown> | null {
   try {
     return JSON.parse(atob(token.split(".")[1]));
@@ -137,48 +158,58 @@ function decodeToken(token: string): Record<string, unknown> | null {
 
 export function getUserRole(): string | null {
   const token = localStorage.getItem("cc_access");
-  if (token) {
-    const payload = decodeToken(token);
-    if (payload?.role) return payload.role as string;
-  }
-  return localStorage.getItem("cc_role");
+  if (!token) return null;
+  const payload = decodeToken(token);
+  return (payload?.role as string) || null;
 }
 
 export function getUserFromToken(): UserProfile | null {
   const token = localStorage.getItem("cc_access");
-  const localRole = localStorage.getItem("cc_role");
-  const localFirstName = localStorage.getItem("cc_first_name");
-  const localLastName = localStorage.getItem("cc_last_name");
-  const localPhone = localStorage.getItem("cc_phone_number");
-  const localBusiness = localStorage.getItem("cc_business_name");
+  if (!token) return null;
+  const payload = decodeToken(token);
+  if (!payload) return null;
 
-  if (token) {
-    const payload = decodeToken(token);
-    if (payload) {
-      return {
-        first_name: (payload.first_name as string) || localFirstName || "User",
-        last_name: (payload.last_name as string) || localLastName || "",
-        phone_number: (payload.phone_number as string) || localPhone || "",
-        role: (payload.role as "MERCHANT" | "WHOLESALER") || (localRole as "MERCHANT" | "WHOLESALER") || "MERCHANT",
-        business_name: (payload.business_name as string) || localBusiness || undefined,
-      };
-    }
+  // Start with token data (may be empty)
+  let firstName = "";
+  let lastName = "";
+  let phoneNumber = (payload.phone_number as string) || (payload.phone as string) || "";
+  let role = (payload.role as "MERCHANT" | "WHOLESALER" | "ADMIN") || "MERCHANT";
+  let businessName = (payload.business_name as string) || undefined;
+  let businessAddress = (payload.business_address as string) || undefined;
+  let businessCategory = (payload.business_category as string) || undefined;
+  let isVerifiedWholesaler = (payload.is_verified_wholesaler as boolean) || false;
+
+  // Override with localStorage items if present (set during registration or profile fetch)
+  const storedFirstName = localStorage.getItem("cc_first_name");
+  const storedLastName = localStorage.getItem("cc_last_name");
+  if (storedFirstName) firstName = storedFirstName;
+  if (storedLastName) lastName = storedLastName;
+
+  // If still empty, try to extract from token's name field (if any)
+  if (!firstName && payload.name) {
+    const nameParts = (payload.name as string).split(' ');
+    firstName = nameParts[0] || "";
+    lastName = nameParts.slice(1).join(' ') || "";
   }
 
-  if (localRole || localFirstName || localLastName || localPhone) {
-    return {
-      first_name: localFirstName || "User",
-      last_name: localLastName || "",
-      phone_number: localPhone || "",
-      role: (localRole as "MERCHANT" | "WHOLESALER") || "MERCHANT",
-      business_name: localBusiness || undefined,
-    };
-  }
+  // Fallback to "User" only if no first name
+  if (!firstName) firstName = "User";
 
-  return null;
+  return {
+    id: (payload.user_id as number) || (payload.id as number),
+    first_name: firstName,
+    last_name: lastName,
+    phone_number: phoneNumber,
+    role,
+    business_name: businessName,
+    business_address: businessAddress,
+    business_category: businessCategory,
+    is_verified_wholesaler: isVerifiedWholesaler,
+  };
 }
 
-// ==================== Token refresh ====================
+// // ==================== Token refresh ====================
+
 let refreshPromise: Promise<string | null> | null = null;
 
 async function refreshAccessToken(): Promise<string | null> {
@@ -207,6 +238,7 @@ async function refreshAccessToken(): Promise<string | null> {
 }
 
 // ==================== Generic fetcher ====================
+
 export class ApiError extends Error {
   status: number;
   data: unknown;
@@ -217,10 +249,7 @@ export class ApiError extends Error {
   }
 }
 
-async function apiFetch<T>(
-  endpoint: string,
-  options: RequestInit = {}
-): Promise<T> {
+async function apiFetch<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
   const tokens = getTokens();
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
@@ -249,6 +278,7 @@ async function apiFetch<T>(
 }
 
 // ==================== Auth ====================
+
 export async function register(payload: UserRegistration) {
   return apiFetch<UserRegistration>("/auth/register/", {
     method: "POST",
@@ -261,21 +291,15 @@ export async function login(phone_number: string, password: string) {
     method: "POST",
     body: JSON.stringify({ phone_number, password }),
   });
-
   setTokens(data);
   return data;
 }
 
-export function logout() {
-  clearTokens();
-}
+export function logout() { clearTokens(); }
+export function isAuthenticated(): boolean { return !!getTokens()?.access; }
 
-export function isAuthenticated(): boolean {
-  return !!getTokens()?.access;
-}
+// ==================== User Profile (JWT-decoded) ====================
 
-// ==================== User Profile ====================
-// /api/users/me/ does not exist — decode from JWT instead.
 export const userApi = {
   getProfile: async (): Promise<UserProfile> => {
     const fromToken = getUserFromToken();
@@ -284,119 +308,204 @@ export const userApi = {
   },
 };
 
-// ==================== Groups (merchant) ====================
+// ==================== Groups ====================
+
 export const groupsApi = {
-  list: () => apiFetch<ChamaGroup[]>("/groups/list/"),
-  get: (id: number) => apiFetch<ChamaGroup>(`/groups/list/${id}/`),
-  create: (data: Partial<ChamaGroup>) =>
-    apiFetch<ChamaGroup>("/groups/list/", {
-      method: "POST",
-      body: JSON.stringify(data),
-    }),
-  update: (id: number, data: Partial<ChamaGroup>) =>
-    apiFetch<ChamaGroup>(`/groups/list/${id}/`, {
-      method: "PATCH",
-      body: JSON.stringify(data),
-    }),
-  delete: (id: number) =>
-    apiFetch<void>(`/groups/list/${id}/`, { method: "DELETE" }),
+  list:   ()                          => apiFetch<ChamaGroup[]>("/groups/list/"),
+  get:    (id: number)                => apiFetch<ChamaGroup>(`/groups/list/${id}/`),
+  create: (data: Partial<ChamaGroup>) => apiFetch<ChamaGroup>("/groups/list/", {
+    method: "POST", body: JSON.stringify(data),
+  }),
+  update: (id: number, data: Partial<ChamaGroup>) => apiFetch<ChamaGroup>(`/groups/list/${id}/`, {
+    method: "PATCH", body: JSON.stringify(data),
+  }),
+  delete: (id: number) => apiFetch<void>(`/groups/list/${id}/`, { method: "DELETE" }),
+
+  // Join a group — PATCH the group to add current user as member
+  join: (id: number) => apiFetch<ChamaGroup>(`/groups/list/${id}/`, {
+    method: "PATCH",
+    body: JSON.stringify({ join: true }),
+  }),
 };
 
-// ==================== Contributions (merchant) ====================
+// ==================== Contributions ====================
+
 export const contributionsApi = {
-  list: () => apiFetch<Contribution[]>("/groups/contributions/"),
-  get: (id: number) => apiFetch<Contribution>(`/groups/contributions/${id}/`),
-  create: (data: { group: number; amount: string }) =>
-    apiFetch<Contribution>("/groups/contributions/", {
-      method: "POST",
-      body: JSON.stringify(data),
-    }),
-  update: (id: number, data: Partial<Contribution>) =>
-    apiFetch<Contribution>(`/groups/contributions/${id}/`, {
-      method: "PATCH",
-      body: JSON.stringify(data),
-    }),
-  delete: (id: number) =>
-    apiFetch<void>(`/groups/contributions/${id}/`, { method: "DELETE" }),
+  list:   ()                                        => apiFetch<Contribution[]>("/groups/contributions/"),
+  get:    (id: number)                              => apiFetch<Contribution>(`/groups/contributions/${id}/`),
+  create: (data: { group: number; amount: string }) => apiFetch<Contribution>("/groups/contributions/", {
+    method: "POST", body: JSON.stringify(data),
+  }),
+  update: (id: number, data: Partial<Contribution>) => apiFetch<Contribution>(`/groups/contributions/${id}/`, {
+    method: "PATCH", body: JSON.stringify(data),
+  }),
+  delete: (id: number) => apiFetch<void>(`/groups/contributions/${id}/`, { method: "DELETE" }),
 };
 
-// ==================== Wholesaler-specific APIs ====================
+// ==================== Merchant Vouchers ====================
+// GET /api/groups/vouchers/ — vouchers belonging to the logged-in merchant
+
+export const vouchersApi = {
+  list: () => apiFetch<MerchantVoucher[]>("/groups/vouchers/"),
+};
+
+// ==================== Wholesaler-specific ====================
+
 export const wholesalerApi = {
-  // GET /api/groups/wholesaler/groups/
-  // All ChamaGroups assigned to the logged-in wholesaler
-  getGroups: () => apiFetch<ChamaGroup[]>("/groups/wholesaler/groups/"),
-
-  // GET /api/groups/wholesaler/vouchers/
-  // All vouchers this wholesaler needs to fulfil
-  getVouchers: () => apiFetch<Voucher[]>("/groups/wholesaler/vouchers/"),
-
-  // PATCH /api/groups/wholesaler/scan/{voucher_id}/
-  // Mark a voucher as claimed (UUID string id)
-  scanVoucher: (voucherId: string) =>
-    apiFetch<void>(`/groups/wholesaler/scan/${voucherId}/`, {
-      method: "PATCH",
-    }),
+  getGroups:   ()                  => apiFetch<ChamaGroup[]>("/groups/wholesaler/groups/"),
+  getVouchers: ()                  => apiFetch<Voucher[]>("/groups/wholesaler/vouchers/"),
+  scanVoucher: (voucherId: string) => apiFetch<void>(`/groups/wholesaler/scan/${voucherId}/`, {
+    method: "PATCH",
+  }),
 };
 
-// ==================== Wholesalers list (merchant use) ====================
+// ==================== Wholesalers list ====================
+
 export const wholesalersApi = {
   list: () => apiFetch<Wholesaler[]>("/auth/wholesalers/"),
 };
 
 // ==================== Payments ====================
+
 export const paymentsApi = {
-  stkPush: (data: STKPushRequest) =>
-    apiFetch<{
-      MerchantRequestID?: string;
-      CheckoutRequestID?: string;
-      ResponseCode?: string;
-      ResponseDescription?: string;
-    }>("/payments/stk-push/", {
-      method: "POST",
-      body: JSON.stringify(data),
-    }),
+  stkPush: (data: STKPushRequest) => apiFetch<{
+    MerchantRequestID?: string;
+    CheckoutRequestID?: string;
+    ResponseCode?: string;
+    ResponseDescription?: string;
+  }>("/payments/stk-push/", { method: "POST", body: JSON.stringify(data) }),
 };
 
-// ==================== Derived APIs ====================
+// ==================== Derived ====================
 
-// Wallet — derived from contributions (no dedicated endpoint)
 export const walletApi = {
   get: async (): Promise<WalletData> => {
     const contributions = await contributionsApi.list();
-    const completed = contributions
-      .filter((c) => c.status === "COMPLETED")
-      .reduce((sum, c) => sum + parseFloat(c.amount), 0);
-    const pending = contributions
-      .filter((c) => c.status === "PENDING")
-      .reduce((sum, c) => sum + parseFloat(c.amount), 0);
-    const total = contributions.reduce(
-      (sum, c) => sum + parseFloat(c.amount),
-      0
-    );
+    const completed = contributions.filter(c => c.status === "COMPLETED").reduce((s, c) => s + parseFloat(c.amount), 0);
+    const pending   = contributions.filter(c => c.status === "PENDING").reduce((s, c) => s + parseFloat(c.amount), 0);
+    const total     = contributions.reduce((s, c) => s + parseFloat(c.amount), 0);
     return { balance: total, savings: completed, payments: pending };
   },
 };
 
-// Recent activities — derived from contributions
 export const activitiesApi = {
   list: async (): Promise<Activity[]> => {
     const contributions = await contributionsApi.list();
     return contributions
-      .sort(
-        (a, b) =>
-          new Date(b.created_at || 0).getTime() -
-          new Date(a.created_at || 0).getTime()
-      )
+      .sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime())
       .slice(0, 5)
-      .map((c) => ({
+      .map(c => ({
         id: c.id,
         user: c.merchant_name || "Member",
         initials: (c.merchant_name || "M").charAt(0).toUpperCase(),
-        time: c.created_at
-          ? new Date(c.created_at).toLocaleString()
-          : "recently",
+        time: c.created_at ? new Date(c.created_at).toLocaleString() : "recently",
         amount: parseFloat(c.amount),
         type: "deposit" as const,
       }));
+  },
+};
+
+// ==================== Credit Engine (client-side) ====================
+// Evaluates loan eligibility based on contribution history and group health.
+// No dedicated backend endpoint — computed from existing data.
+
+export const creditEngine = {
+  scoreMerchant: (
+    contributions: Contribution[],
+    groups: ChamaGroup[],
+  ): CreditScore => {
+    const reasons: string[] = [];
+    const recommendations: string[] = [];
+    let score = 0;
+
+    const completed  = contributions.filter(c => c.status === "COMPLETED");
+    const total      = contributions.length;
+    const successRate = total > 0 ? completed.length / total : 0;
+    const totalAmount = completed.reduce((s, c) => s + parseFloat(c.amount), 0);
+
+    // 1. Contribution consistency (30 pts)
+    if (total >= 10)      { score += 30; reasons.push("10+ contributions made"); }
+    else if (total >= 5)  { score += 20; reasons.push("5–9 contributions made"); }
+    else if (total >= 1)  { score += 10; reasons.push("At least 1 contribution made"); }
+    else                  { recommendations.push("Make your first contribution to build credit"); }
+
+    // 2. Success rate (25 pts)
+    if (successRate >= 0.9)      { score += 25; reasons.push("Excellent payment success rate (90%+)"); }
+    else if (successRate >= 0.7) { score += 15; reasons.push("Good payment success rate (70%+)"); }
+    else if (successRate >= 0.5) { score += 5;  recommendations.push("Improve payment success rate"); }
+    else                         { recommendations.push("Many failed payments — resolve pending issues"); }
+
+    // 3. Total contributed (20 pts)
+    if (totalAmount >= 50000)     { score += 20; reasons.push("Contributed KES 50,000+"); }
+    else if (totalAmount >= 10000){ score += 12; reasons.push("Contributed KES 10,000+"); }
+    else if (totalAmount >= 1000) { score += 6;  reasons.push("Contributed KES 1,000+"); }
+    else                          { recommendations.push("Increase total contributions to improve score"); }
+
+    // 4. Group membership (15 pts)
+    const myGroupIds = new Set(contributions.map(c => c.group));
+    const myGroups   = groups.filter(g => myGroupIds.has(g.id));
+    if (myGroups.length >= 3)     { score += 15; reasons.push("Member of 3+ groups"); }
+    else if (myGroups.length >= 1){ score += 8;  reasons.push("Member of at least 1 group"); }
+    else                          { recommendations.push("Join a chama group to improve eligibility"); }
+
+    // 5. Active group bonus (10 pts)
+    const activeGroups = myGroups.filter(g => g.is_active);
+    if (activeGroups.length > 0)  { score += 10; reasons.push(`Active in ${activeGroups.length} group(s)`); }
+    else                          { recommendations.push("Ensure your groups are active"); }
+
+    const grade =
+      score >= 80 ? "A" :
+      score >= 65 ? "B" :
+      score >= 50 ? "C" :
+      score >= 35 ? "D" : "F";
+
+    const eligible = score >= 50;
+    const maxLoan  = eligible ? Math.round(totalAmount * (score / 100) * 2) : 0;
+
+    return { score, grade, eligible, maxLoan, reasons, recommendations };
+  },
+
+  scoreGroup: (group: ChamaGroup, contributions: Contribution[]): GroupCreditScore => {
+    const reasons: string[] = [];
+    let score = 0;
+
+    const current  = parseFloat(group.current_amount || "0");
+    const target   = parseFloat(group.target_amount  || "1");
+    const progress = current / target;
+    const groupContribs = contributions.filter(c => c.group === group.id);
+    const completed     = groupContribs.filter(c => c.status === "COMPLETED");
+
+    // 1. Funding progress (35 pts)
+    if (progress >= 0.75)      { score += 35; reasons.push("75%+ funded"); }
+    else if (progress >= 0.5)  { score += 25; reasons.push("50%+ funded"); }
+    else if (progress >= 0.25) { score += 15; reasons.push("25%+ funded"); }
+    else                       { reasons.push("Less than 25% funded — needs more contributions"); }
+
+    // 2. Member count (25 pts)
+    const members = group.members_count || 0;
+    if (members >= 10)      { score += 25; reasons.push("10+ active members"); }
+    else if (members >= 5)  { score += 15; reasons.push("5–9 members"); }
+    else if (members >= 2)  { score += 8;  reasons.push("2–4 members"); }
+    else                    { reasons.push("Low membership"); }
+
+    // 3. Contribution volume (25 pts)
+    if (completed.length >= 20) { score += 25; reasons.push("20+ completed contributions"); }
+    else if (completed.length >= 10) { score += 15; reasons.push("10+ completed contributions"); }
+    else if (completed.length >= 5)  { score += 8;  reasons.push("5+ completed contributions"); }
+
+    // 4. Active status (15 pts)
+    if (group.is_active) { score += 15; reasons.push("Group is active"); }
+
+    const grade =
+      score >= 80 ? "A" :
+      score >= 65 ? "B" :
+      score >= 50 ? "C" :
+      score >= 35 ? "D" : "F";
+
+    const eligible    = score >= 50;
+    const fundingGap  = Math.max(0, target - current);
+    const maxGroupLoan = eligible ? Math.round(current * 0.5) : 0;
+
+    return { groupId: group.id, groupName: group.name, score, grade, eligible, fundingGap, maxGroupLoan, reasons };
   },
 };

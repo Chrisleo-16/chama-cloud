@@ -16,6 +16,7 @@ import {
   getUserFromToken,
   type UserRegistration,
   type UserProfile,
+  userApi,
 } from "@/lib/api";
 
 interface AuthContextType {
@@ -37,38 +38,60 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [userRole, setUserRole] = useState<string | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
 
-  // Read auth state from token in localStorage
-  const updateAuthState = useCallback(() => {
+  const fetchAndSetProfile = useCallback(async () => {
+    try {
+      const userProfile = await userApi.getProfile();
+      setProfile(userProfile);
+      // Cache in localStorage for instant load on next page refresh
+      localStorage.setItem("user_profile", JSON.stringify(userProfile));
+      return userProfile;
+    } catch (error) {
+      console.error("Failed to fetch profile", error);
+      return null;
+    }
+  }, []);
+
+  const updateAuthState = useCallback(async () => {
     const loggedIn = isAuthenticated();
     setIsLoggedIn(loggedIn);
     if (loggedIn) {
       const role = localStorage.getItem("user_role") || getUserRole();
-      const user = getUserFromToken();
       setUserRole(role);
-      setProfile(user);
+
+      // First try to restore profile from localStorage for speed
+      const storedProfile = localStorage.getItem("user_profile");
+      if (storedProfile) {
+        try {
+          setProfile(JSON.parse(storedProfile));
+        } catch (e) {}
+      }
+
+      // Then fetch fresh profile (async)
+      await fetchAndSetProfile();
     } else {
       setUserRole(null);
       setProfile(null);
+      localStorage.removeItem("user_profile");
     }
-  }, []);
+    setLoading(false);
+  }, [fetchAndSetProfile]);
 
   useEffect(() => {
     updateAuthState();
-    setLoading(false);
     window.addEventListener("storage", updateAuthState);
     return () => window.removeEventListener("storage", updateAuthState);
   }, [updateAuthState]);
 
   const login = useCallback(
     async (phone: string, password: string) => {
-      const response = await apiLogin(phone, password);
-      if (response.role) {
-        localStorage.setItem("user_role", response.role);
+      try {
+        await apiLogin(phone, password);
+        // After login, token is stored; now fetch profile
+        await updateAuthState();
+      } catch (error) {
+        console.error('Login failed:', error);
+        throw error;
       }
-      updateAuthState();
-
-      // Role-based redirect is handled in ProtectedRoute / LoginPage
-      // by reading userRole after this resolves
     },
     [updateAuthState],
   );
@@ -76,8 +99,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const register = useCallback(
     async (payload: UserRegistration) => {
       await apiRegister(payload);
+      // Store the user's first and last name in localStorage for later use
+      localStorage.setItem("cc_first_name", payload.first_name);
+      localStorage.setItem("cc_last_name", payload.last_name);
+      // Now login with the new credentials
       await apiLogin(payload.phone_number, payload.password);
-      updateAuthState();
+      await updateAuthState();
     },
     [updateAuthState],
   );

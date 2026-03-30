@@ -7,10 +7,10 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ApiError, getUserFromToken } from "@/lib/api";
-import { Loader2, Phone, Lock, User, Sprout, Building } from "lucide-react";
+import { Loader2, Phone, Lock, User, Sprout, Building, ShieldCheck } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
-type Role = "MERCHANT" | "WHOLESALER";
+type Role = "MERCHANT" | "WHOLESALER" | "ADMIN";
 
 export default function Register() {
   const [form, setForm] = useState({
@@ -22,6 +22,8 @@ export default function Register() {
     business_name: "",
     mpesa_shortcode: "",
     shortcode_type: "" as "" | "PAYBILL" | "TILL",
+    business_address: "",
+    business_category: "",
   });
   
   const [loading, setLoading] = useState(false);
@@ -37,13 +39,14 @@ export default function Register() {
     setLoading(true);
 
     try {
-      // 1. Logic: Clean the data so we don't send Wholesaler info for Merchants
       const registrationData = {
         phone_number: form.phone_number.trim(),
         first_name: form.first_name.trim(),
         last_name: form.last_name.trim(),
         password: form.password,
         role: form.role,
+        business_address: form.business_address.trim(),
+        business_category: form.business_category.trim(),
         ...(form.role === "WHOLESALER" && {
           business_name: form.business_name.trim(),
           mpesa_shortcode: form.mpesa_shortcode.trim(),
@@ -51,25 +54,29 @@ export default function Register() {
         }),
       };
 
-      // 2. Validation: Basic Kenyan Phone check (starts with 254 or 07/01)
       if (!/^(?:254|\+254|0)?(7|1)\d{8}$/.test(registrationData.phone_number)) {
         throw new Error("Please enter a valid Kenyan phone number.");
       }
 
-      const resp = await register(registrationData);
+      await register(registrationData);
       
       toast({ title: "Account created!", description: "Welcome to Chama Cloud" });
       
-      // Prefer token / response role from signup from backend, else form role fallback
       const user = getUserFromToken();
-      const role = user?.role || (resp as any)?.role || form.role;
-      const destination = role === "WHOLESALER" ? "/wholesaler" : "/dashboard";
+      const role = user?.role || form.role;
+      
+      let destination = "/dashboard";
+      if (role === "ADMIN") destination = "/admin";
+      else if (role === "WHOLESALER") destination = "/wholesaler";
+      
       navigate(destination, { replace: true });
       
-    } catch (err: any) {
-      const message = err instanceof ApiError 
-        ? err.message 
-        : err.message || "Something went wrong.";
+    } catch (err: unknown) {
+      const message = err instanceof ApiError
+        ? err.message
+        : err instanceof Error
+          ? err.message
+          : "Something went wrong.";
         
       toast({ title: "Error", description: message, variant: "destructive" });
     } finally {
@@ -159,8 +166,32 @@ export default function Register() {
                   <SelectContent>
                     <SelectItem value="MERCHANT">Merchant (Retailer)</SelectItem>
                     <SelectItem value="WHOLESALER">Wholesaler (Supplier)</SelectItem>
+                    <SelectItem value="ADMIN">System Administrator</SelectItem>
                   </SelectContent>
                 </Select>
+              </div>
+
+              <div className="grid grid-cols-1 gap-3">
+                <div className="space-y-2">
+                  <Label htmlFor="business_address">Location</Label>
+                  <Input
+                    id="business_address"
+                    placeholder="e.g. Nairobi, Kenya"
+                    value={form.business_address}
+                    onChange={(e) => update("business_address", e.target.value)}
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="business_category">Profession</Label>
+                  <Input
+                    id="business_category"
+                    placeholder="e.g. Produce Retailer"
+                    value={form.business_category}
+                    onChange={(e) => update("business_category", e.target.value)}
+                    required
+                  />
+                </div>
               </div>
 
               {form.role === "WHOLESALER" && (

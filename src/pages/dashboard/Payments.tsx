@@ -1,8 +1,9 @@
 'use client';
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { paymentsApi, groupsApi, contributionsApi } from "@/lib/api";
+import { paymentsApi, groupsApi, contributionsApi, userApi } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 import {
   Loader2, Smartphone, CreditCard, History, CheckCircle, XCircle,
@@ -27,6 +28,30 @@ export default function Payments() {
 
   const { data: groups,        isLoading: gL } = useQuery({ queryKey: ["groups"],        queryFn: groupsApi.list });
   const { data: contributions, isLoading: cL } = useQuery({ queryKey: ["contributions"], queryFn: contributionsApi.list });
+  const { data: profile,      isLoading: pL } = useQuery({ queryKey: ["profile"],       queryFn: userApi.getProfile });
+  const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    const preselected = searchParams.get("groupId");
+    if (preselected) setGroupId(preselected);
+  }, [searchParams]);
+
+  const currentUserId = profile?.id;
+  const myContributions = (contributions || []).filter((c) => {
+    if (c.merchant && +c.merchant === +currentUserId) return true;
+    const merchantName = profile?.first_name?.toLowerCase() || "";
+    return !!(c.merchant_name && merchantName && c.merchant_name.toLowerCase().startsWith(merchantName));
+  });
+
+  const myGroups = (groups || []).filter((g) => {
+    if (profile?.role === "WHOLESALER" && currentUserId) {
+      return g.wholesaler === currentUserId;
+    }
+
+    // Show all active groups for merchants to contribute to
+    return g.is_active;
+  });
 
   const stkMut = useMutation({
     mutationFn: paymentsApi.stkPush,
@@ -38,7 +63,7 @@ export default function Payments() {
     onError: () => toast({ title: "Payment failed", description: "Could not initiate M-Pesa.", variant: "destructive" }),
   });
 
-  const sortedContribs = [...(contributions || [])].sort(
+  const sortedContribs = [...(myContributions || [])].sort(
     (a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime()
   );
 
@@ -58,6 +83,10 @@ export default function Payments() {
         </p>
         <h1 className="cc-h1 mb-1">Payments</h1>
         <p className="text-sm text-[var(--fg-muted)]">Initiate M-Pesa STK push contributions to your groups</p>
+        <div className="mt-4 flex gap-2">
+          <button onClick={() => navigate('/dashboard/deposit')} className="cc-btn-primary text-xs">Deposit</button>
+          <button onClick={() => navigate('/dashboard/withdraw')} className="cc-btn-outline text-xs">Withdraw</button>
+        </div>
       </div>
 
       {/* Two column */}
@@ -85,7 +114,7 @@ export default function Payments() {
               <label className="cc-label">Select Group</label>
               <select value={groupId} onChange={e => setGroupId(e.target.value)} className="cc-select" required>
                 <option value="">Choose a group…</option>
-                {groups?.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
+                {myGroups?.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
               </select>
             </div>
 
@@ -198,7 +227,7 @@ export default function Payments() {
                 <thead><tr><th>Date</th><th>Group</th><th className="text-right">Amount</th><th>Status</th></tr></thead>
                 <tbody>
                   {sortedContribs.map((c, i) => {
-                    const group  = groups?.find(g => g.id === c.group);
+                    const group  = myGroups?.find(g => g.id === c.group);
                     const status = (c.status || "PENDING") as "COMPLETED" | "PENDING" | "FAILED";
                     const icons  = { COMPLETED: CheckCircle, PENDING: Clock, FAILED: XCircle };
                     const clses  = { COMPLETED: 'cc-badge-success', PENDING: 'cc-badge-warning', FAILED: 'cc-badge-danger' };

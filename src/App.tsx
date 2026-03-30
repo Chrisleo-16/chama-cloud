@@ -17,12 +17,19 @@ import Groups from "./pages/dashboard/Groups";
 import Contributions from "./pages/dashboard/Contributions";
 import Payments from "./pages/dashboard/Payments";
 import Vouchers from "./pages/dashboard/Vouchers";
+import Deposit from "./pages/dashboard/Deposit";
+import Withdraw from "./pages/dashboard/Withdraw";
+import NewChama from "./pages/dashboard/NewChama";
+import Invite from "./pages/dashboard/Invite";
+import GroupDetails from "./pages/dashboard/GroupDetails";
+import Reports from "./pages/dashboard/Reports";
 import AdminDashboard from "./pages/admin/AdminDashboard";
 import Wholesalers from "./pages/admin/Wholesalers";
 import Refund from "./pages/admin/Refund";
 import WholesalerPortal from "./pages/admin/WholesalersPortal";
 import Profile from "./pages/dashboard/Profiles";
 import WholesalerDashboard from "./pages/wholesaler/WholesalersDashboard";
+import CreditEngine from "./pages/dashboard/CreditEngine";
 
 const queryClient = new QueryClient();
 
@@ -58,10 +65,6 @@ const App = () => (
             {/* Auth */}
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
-            <Route path="/dashboard" element={<DashboardLayout />}>
-  <Route index element={<Overview />} /> {/* Without this, /dashboard is blank! */}
-  <Route path="groups" element={<Groups />} />
-</Route>
 
             {/* ── Merchant Dashboard ──────────────────────────────────── */}
             <Route
@@ -77,7 +80,14 @@ const App = () => (
               <Route path="contributions" element={<Contributions />} />
               <Route path="payments" element={<Payments />} />
               <Route path="vouchers" element={<Vouchers />} />
+              <Route path="deposit" element={<Deposit />} />
+              <Route path="withdraw" element={<Withdraw />} />
+              <Route path="new-chama" element={<NewChama />} />
+              <Route path="invite" element={<Invite />} />
+              <Route path="reports" element={<Reports />} />
+              <Route path="group/:id" element={<GroupDetails />} />
               <Route path="profile" element={<Profile />} />
+              <Route path="credit"     element={<CreditEngine />} />
             </Route>
 
             {/* ── Wholesaler Dashboard ────────────────────────────────── */}
@@ -100,7 +110,7 @@ const App = () => (
                 <Route path="portal" element={<WholesalerPortal />} />
               </Route>
             </Route>
-            
+
             {/* 404 */}
             <Route path="*" element={<NotFound />} />
           </Routes>

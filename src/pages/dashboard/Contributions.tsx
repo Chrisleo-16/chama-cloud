@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { contributionsApi, groupsApi, type Contribution } from "@/lib/api";
+import { contributionsApi, groupsApi, userApi, type Contribution } from "@/lib/api";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
@@ -34,6 +34,41 @@ export default function Contributions() {
 
   const { data: contributions, isLoading } = useQuery({ queryKey: ["contributions"], queryFn: contributionsApi.list });
   const { data: groups }                   = useQuery({ queryKey: ["groups"],        queryFn: groupsApi.list });
+  const { data: profile }                  = useQuery({ queryKey: ["profile"],       queryFn: userApi.getProfile });
+
+  const currentUserId = profile?.id;
+  const userRole = profile?.role;
+
+  // Filter contributions to only show current user's contributions
+  const myContributions = (contributions || []).filter((c) => {
+    if (!profile) return false;
+    if (!currentUserId) return false; // avoid global fallback, make data user-specific
+
+    // Prefer numeric match by user id if available (merchant field points at merchant user)
+    if (c.merchant && +c.merchant === +currentUserId) return true;
+
+    // Fallback by merchant_name exact or starts-with (less aggressive)
+    const merchantName = profile.first_name ? `${profile.first_name}`.trim().toLowerCase() : "";
+    if (merchantName && c.merchant_name && c.merchant_name.toLowerCase().startsWith(merchantName)) return true;
+
+    return false;
+  });
+
+  // Filter groups to show appropriate groups for each role
+  const myGroups = (groups || []).filter((g) => {
+    if (userRole === "WHOLESALER" && currentUserId) {
+      // For wholesaler, show groups assigned to them
+      return g.wholesaler === currentUserId;
+    }
+
+    // For merchants, show all active groups they can contribute to
+    if (userRole === "MERCHANT") {
+      return g.is_active;
+    }
+
+    // Admin sees everything
+    return true;
+  });
 
   const createMut = useMutation({
     mutationFn: contributionsApi.create,
@@ -52,12 +87,15 @@ export default function Contributions() {
     onError: () => toast({ title: "Failed to delete", variant: "destructive" }),
   });
 
-  const total     = contributions?.reduce((s, c) => s + parseFloat(c.amount), 0) ?? 0;
-  const completed = contributions?.filter(c => c.status === "COMPLETED").length ?? 0;
-  const pending   = contributions?.filter(c => c.status === "PENDING").length ?? 0;
-  const rate      = contributions?.length ? Math.round((completed / contributions.length) * 100) : 0;
+  const totalContributed = myContributions.reduce((s, c) => s + parseFloat(c.amount || "0"), 0);
+  const completedContributions = myContributions
+    .filter(c => c.status === "COMPLETED")
+    .reduce((s, c) => s + parseFloat(c.amount || "0"), 0);
+  const completed = myContributions.filter(c => c.status === "COMPLETED").length;
+  const pending   = myContributions.filter(c => c.status === "PENDING").length;
+  const rate      = myContributions.length ? Math.round((completed / myContributions.length) * 100) : 0;
 
-  const filtered = contributions?.filter(c => {
+  const filtered = myContributions.filter(c => {
     const matchesStatus = statusFilter === 'ALL' || c.status === statusFilter;
     const matchesSearch = !search || c.merchant_name?.toLowerCase().includes(search.toLowerCase()) || String(c.id).includes(search);
     return matchesStatus && matchesSearch;
@@ -99,7 +137,7 @@ export default function Contributions() {
                         <SelectValue placeholder="Select a group" />
                       </SelectTrigger>
                       <SelectContent className="bg-[var(--bg-card)] border border-[var(--border-mid)] rounded-xl shadow-xl">
-                        {groups?.map(g => <SelectItem key={g.id} value={String(g.id)} className="text-[var(--fg)] hover:bg-[var(--bg-alt)]">{g.name}</SelectItem>)}
+                        {myGroups?.map(g => <SelectItem key={g.id} value={String(g.id)} className="text-[var(--fg)] hover:bg-[var(--bg-alt)]">{g.name}</SelectItem>)}
                       </SelectContent>
                     </Select>
                   </div>
@@ -121,7 +159,7 @@ export default function Contributions() {
       {/* Stat strip */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 cc-fade cc-d1">
         {[
-          { label: 'Total Contributed', value: formatKES(total), icon: Coins,       color: true  },
+          { label: 'Total Contributed', value: formatKES(totalContributed), icon: Coins,       color: true  },
           { label: 'Completed',         value: completed,        icon: CheckCircle, color: true  },
           { label: 'Pending',           value: pending,          icon: Clock,       color: false },
           { label: 'Success Rate',      value: `${rate}%`,       icon: TrendingUp,  color: rate > 80 },
@@ -171,7 +209,7 @@ export default function Contributions() {
               </thead>
               <tbody>
                 {filtered?.map((c, i) => {
-                  const groupName = groups?.find(g => g.id === c.group)?.name || `Group #${c.group}`;
+                  const groupName = myGroups?.find(g => g.id === c.group)?.name || `Group #${c.group}`;
                   const status    = c.status as keyof typeof STATUS_CFG || "PENDING";
                   const { cls, icon: Icon, label } = STATUS_CFG[status] ?? STATUS_CFG.PENDING;
                   return (
