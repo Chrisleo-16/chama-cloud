@@ -28,6 +28,31 @@ class ChamaGroup(models.Model):
     def is_fully_funded(self):
         return self.current_amount >= self.target_amount
 
+    @property
+    def chama_score(self):
+        """
+        Calculates a dynamic Trust Score (300 - 850).
+        Base score is 300. 
+        They get up to 500 points based on funding percentage.
+        They get up to 50 extra points based on community size (contributors).
+        """
+        base_score = 300
+        
+        # 1. Calculate funding progress (0.0 to 1.0)
+        progress = 0
+        if self.target_amount > 0:
+            progress = float(self.current_amount) / float(self.target_amount)
+            progress = min(progress, 1.0) # Cap at 100% if they overfund
+            
+        funding_points = int(progress * 500)
+        
+        # 2. Calculate community strength (Max 50 points)
+        # We count how many unique merchants have contributed to this group
+        unique_members = self.contributions.values('merchant').distinct().count()
+        community_points = min(unique_members * 10, 50)
+        
+        return base_score + funding_points + community_points
+
 
 class Contribution(models.Model):
     STATUS_CHOICES = [
@@ -88,4 +113,5 @@ class ClaimVoucher(models.Model):
     claimed_at = models.DateTimeField(blank=True, null=True)
 
     def __str__(self):
-        return f"Voucher for {self.merchant.username} - {self.group.name}"
+        return f"Voucher for {self.merchant.first_name} - {self.group.name}"
+

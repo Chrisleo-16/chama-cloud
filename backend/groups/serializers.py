@@ -13,13 +13,14 @@ class ContributionSerializer(serializers.ModelSerializer):
 class ChamaGroupSerializer(serializers.ModelSerializer):
     progress_percentage = serializers.SerializerMethodField()
     wholesaler_name = serializers.CharField(source='wholesaler.business_name', read_only=True)
+    chama_score = serializers.IntegerField(read_only=True)
 
     class Meta:
         model = ChamaGroup
         fields = [
             'id', 'name', 'description', 'target_amount', 'current_amount',
             'wholesaler', 'wholesaler_name', 'is_active', 'is_fully_funded',
-            'progress_percentage', 'created_at'
+            'progress_percentage', 'created_at', 'chama_score'
         ]
 
     # Calculate the percentage for the React progress bars
