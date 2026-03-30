@@ -48,7 +48,7 @@ class Contribution(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return f"{self.merchant.username} - {self.amount} to {self.group.name}"
+        return f"{self.merchant.phone_number} - {self.amount} to {self.group.name}"
 
     def save(self, *args, **kwargs):
         super().save(*args, **kwargs)
@@ -60,9 +60,6 @@ class Contribution(models.Model):
         
         self.group.current_amount = completed_total
         if self.group.is_fully_funded and not self.group.vouchers.exists():
-            # If the group just hit 100%, generate a voucher for every merchant who paid
-            # We find all unique merchants who contributed
-            from django.db.models import Sum
             
             merchants = self.group.contributions.filter(status='COMPLETED').values('merchant').annotate(total_paid=Sum('amount'))
             
