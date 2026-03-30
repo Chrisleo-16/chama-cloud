@@ -63,7 +63,7 @@ class Contribution(models.Model):
             
             merchants = self.group.contributions.filter(status='COMPLETED').values('merchant').annotate(total_paid=Sum('amount'))
             
-            from .models import ClaimVoucher
+            from .models import ClaimVoucher  # Deferred to avoid circular import
             for m in merchants:
                 ClaimVoucher.objects.create(
                     group=self.group,
