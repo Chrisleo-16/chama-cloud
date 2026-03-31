@@ -3,8 +3,8 @@ import { useAuth } from "@/contexts/AuthContext";
 
 interface ProtectedRouteProps {
   children?: React.ReactNode;
-  // Optional — if provided, user must have this role or gets redirected
-  requiredRole?: "MERCHANT" | "WHOLESALER";
+  // Added "ADMIN" to the allowed roles
+  requiredRole?: "MERCHANT" | "WHOLESALER" | "ADMIN";
 }
 
 export default function ProtectedRoute({
@@ -13,6 +13,7 @@ export default function ProtectedRoute({
 }: ProtectedRouteProps) {
   const { isLoggedIn, loading, userRole } = useAuth();
 
+  // 1. Still loading auth state
   if (loading) {
     return (
       <div className="flex items-center justify-center h-screen">
@@ -21,16 +22,23 @@ export default function ProtectedRoute({
     );
   }
 
-  // Not logged in → send to login
+  // 2. Not logged in → send to login
   if (!isLoggedIn) return <Navigate to="/login" replace />;
 
-  // Wrong role → redirect to correct dashboard
+  // 3. Role Check & Redirection Logic
   if (requiredRole && userRole !== requiredRole) {
-    if (userRole === "WHOLESALER") return <Navigate to="/wholesaler" replace />;
-    return <Navigate to="/dashboard" replace />;
+    // Determine the "Home Base" for each role to prevent unauthorized access
+    switch (userRole) {
+      case "ADMIN":
+        return <Navigate to="/admin" replace />;
+      case "WHOLESALER":
+        return <Navigate to="/wholesaler" replace />;
+      case "MERCHANT":
+      default:
+        return <Navigate to="/dashboard" replace />;
+    }
   }
 
-  // Support both wrapper usage (<ProtectedRoute><Layout/></ProtectedRoute>)
-  // and outlet usage (<ProtectedRoute/> wrapping nested routes via AdminGuard pattern)
+  // 4. Support both wrapper usage and Outlet usage
   return children ? <>{children}</> : <Outlet />;
 }

@@ -1,7 +1,10 @@
 'use client';
 
+import React, { useEffect, useState } from "react";
+import { Navigate, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { groupsApi, contributionsApi, walletApi, activitiesApi, userApi } from "@/lib/api";
+import { groupsApi, contributionsApi } from "@/lib/api";
+import { useAuth } from "@/contexts/AuthContext";
 import {
   Users, TrendingUp, Target, Wallet, ArrowUpRight, Calendar,
   CreditCard, PiggyBank, Clock, CheckCircle, PlusCircle, Send,
@@ -10,8 +13,17 @@ import {
 import { Loader2 } from "lucide-react";
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 
-const formatKES = (amount: number) =>
+export const formatKES = (amount: number) =>
   new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES', minimumFractionDigits: 0 }).format(amount);
+
+interface DashboardActivity {
+  id: number;
+  user: string;
+  initials: string;
+  time: string;
+  amount: number;
+  type: "deposit";
+}
 
 const sparklineData = [
   { v: 12000 }, { v: 19000 }, { v: 15000 }, { v: 22000 },
@@ -19,42 +31,178 @@ const sparklineData = [
 ];
 
 export default function Overview() {
-  const { data: groups,        isLoading: gL } = useQuery({ queryKey: ["groups"],        queryFn: groupsApi.list });
-  const { data: contributions, isLoading: cL } = useQuery({ queryKey: ["contributions"], queryFn: contributionsApi.list });
-  const { data: wallet,        isLoading: wL } = useQuery({ queryKey: ["wallet"],        queryFn: walletApi.get });
-  const { data: activities,    isLoading: aL } = useQuery({ queryKey: ["activities"],    queryFn: activitiesApi.list });
-  const { data: profile,       isLoading: pL } = useQuery({ queryKey: ["profile"],       queryFn: userApi.getProfile });
+  // ── Auth context gives us profile + role already fetched ─────────────────
+  const { profile, userRole, loading: authLoading } = useAuth();
 
-  if (gL || cL || wL || aL || pL) return (
+  const { data: groups, isLoading: gL, isError: gE } = useQuery({
+    queryKey: ["groups"],
+    queryFn: groupsApi.list,
+  });
+  const { data: contributions, isLoading: cL, isError: cE } = useQuery({
+    queryKey: ["contributions"],
+    queryFn: contributionsApi.list,
+  });
+
+  const [referralToken, setReferralToken] = useState<string | null>(null);
+  const [referredBy, setReferredBy] = useState<string | null>(null);
+  const navigate = useNavigate();
+
+  // Derive display values from context profile (already real data)
+  const firstName = profile?.first_name || "Member";
+  const currentUserId = profile?.id;
+
+  useEffect(() => {
+    if (!profile) return;
+    if (profile.phone_number) {
+      setReferralToken(profile.phone_number);
+    } else if (profile.id) {
+      setReferralToken(`${profile.id}`);
+    }
+
+    const urlRef = new URLSearchParams(window.location.search).get("ref");
+    if (urlRef) {
+      setReferredBy(urlRef);
+      localStorage.setItem("cc_referred_by", urlRef);
+    } else {
+      setReferredBy(localStorage.getItem("cc_referred_by"));
+    }
+  }, [profile]);
+
+  // ── Loading state ─────────────────────────────────────────────────────────
+  if (authLoading || gL || cL) return (
     <div className="flex items-center justify-center h-80">
       <div className="text-center space-y-4">
         <div className="w-12 h-12 rounded-2xl bg-[var(--brand-tint)] border border-[var(--brand-border)] flex items-center justify-center mx-auto">
           <Leaf className="w-6 h-6 text-[var(--brand-light)] cc-spin" />
         </div>
         <p className="text-sm font-medium text-[var(--fg-muted)]">Loading your dashboard…</p>
+        <p className="text-xs text-[var(--fg-muted)] mt-2">
+          Groups: {gL ? 'Loading...' : 'Loaded'} | Contributions: {cL ? 'Loading...' : 'Loaded'} | Profile: {authLoading ? 'Loading...' : 'Loaded'}
+        </p>
       </div>
     </div>
   );
 
-  const totalContributed  = contributions?.reduce((s, c) => s + parseFloat(c.amount || "0"), 0) ?? 0;
-  const activeGroups      = groups?.filter(g => g.is_active).length ?? 0;
-  const firstName         = profile?.first_name || "Member";
-  const walletBalance     = wallet?.balance || 0;
-  const procGroup         = groups?.find(g => g.is_active);
-  const procProgress      = procGroup
+  // ── Error state ───────────────────────────────────────────────────────────
+  if (gE || cE) return (
+    <div className="flex items-center justify-center h-80">
+      <div className="text-center space-y-4">
+        <div className="w-12 h-12 rounded-2xl bg-red-100 border border-red-200 flex items-center justify-center mx-auto">
+          <span className="text-red-600 text-xl">⚠</span>
+        </div>
+        <p className="text-sm font-medium text-red-600">Error loading dashboard</p>
+        <p className="text-xs text-[var(--fg-muted)] mt-2">Please refresh the page</p>
+        <button onClick={() => window.location.reload()} className="cc-btn-primary text-sm mt-2">Refresh</button>
+      </div>
+    </div>
+  );
+
+  // ── Role-based redirect ───────────────────────────────────────────────────
+  // WHOLESALER has their own dashboard at /wholesaler (not /admin)
+  if (userRole === "WHOLESALER") {
+    return <Navigate to="/wholesaler" replace />;
+  }
+
+  // ── Derived data ──────────────────────────────────────────────────────────
+  const myContributions = (contributions || []).filter((c) => {
+    if (!profile) return false;
+    
+    // Primary match: by merchant ID (same as Groups page)
+    if (c.merchant && profile.id && +c.merchant === +profile.id) {
+      console.log('✅ Matched by ID:', { contributionId: c.id, merchantId: c.merchant, userId: profile.id });
+      return true;
+    }
+    
+    // Secondary match: by merchant name (same as Groups page)
+    const name = profile.first_name?.trim().toLowerCase() || "";
+    if (name && c.merchant_name?.toLowerCase().startsWith(name)) {
+      console.log('✅ Matched by name:', { 
+        contributionId: c.id, 
+        profileName: name, 
+        contributionName: c.merchant_name 
+      });
+      return true;
+    }
+    
+    return false;
+  });
+
+  // Debug: Log data to console
+  console.log('🔍 Overview Debug:', {
+    profile: {
+      id: profile?.id,
+      name: profile?.first_name,
+      role: profile?.role,
+      phoneNumber: profile?.phone_number
+    },
+    contributions: {
+      total: contributions?.length,
+      filtered: myContributions.length,
+      sample: contributions?.slice(0, 2),
+      allContributions: contributions?.map(c => ({
+        id: c.id,
+        amount: c.amount,
+        status: c.status,
+        merchant: c.merchant,
+        merchant_name: c.merchant_name,
+        group: c.group
+      }))
+    },
+    wallet: {
+      totalContributed: myContributions.reduce((s, c) => s + parseFloat(c.amount || "0"), 0),
+      completedContributions: myContributions
+        .filter(c => c.status === "COMPLETED")
+        .reduce((s, c) => s + parseFloat(c.amount || "0"), 0),
+      balance: myContributions
+        .filter(c => c.status === "COMPLETED")
+        .reduce((s, c) => s + parseFloat(c.amount || "0"), 0),
+      completedContributionsList: myContributions.filter(c => c.status === "COMPLETED")
+    }
+  });
+
+  const myGroups = (groups || []).filter((g) => {
+    if (userRole === "WHOLESALER" && currentUserId) return g.wholesaler === currentUserId;
+    if (userRole === "MERCHANT") return myContributions.some((c) => c.group === g.id);
+    return true;
+  });
+
+  const totalContributed = myContributions.reduce((s, c) => s + parseFloat(c.amount || "0"), 0);
+  const completedContributions = myContributions
+    .filter(c => c.status === "COMPLETED")
+    .reduce((s, c) => s + parseFloat(c.amount || "0"), 0);
+  const walletBalance = completedContributions;
+  const activeGroups = myGroups.filter((g) => g.is_active).length;
+
+  const procGroup = myGroups.find((g) => g.is_active);
+  const procProgress = procGroup
     ? (parseFloat(procGroup.current_amount || "0") / parseFloat(procGroup.target_amount)) * 100
     : 0;
-  const procRemaining     = procGroup
+  const procRemaining = procGroup
     ? parseFloat(procGroup.target_amount) - parseFloat(procGroup.current_amount || "0")
     : 0;
+
+  const referralLink = referralToken
+    ? `${window.location.origin}/register?ref=${encodeURIComponent(referralToken)}`
+    : "";
+
+  const activities = myContributions
+    .sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime())
+    .slice(0, 5)
+    .map((c) => ({
+      id: c.id,
+      user: "You",
+      initials: (profile?.first_name || "Y").charAt(0).toUpperCase(),
+      time: c.created_at ? new Date(c.created_at).toLocaleString() : "recently",
+      amount: parseFloat(c.amount),
+      type: "deposit" as const,
+    }));
 
   return (
     <div className="space-y-8 pb-16 max-w-[1440px] mx-auto">
 
-      {/* ══ HERO WELCOME ══════════════════════════════════════════════ */}
+      {/* HERO WELCOME */}
       <div className="relative overflow-hidden rounded-2xl border border-[var(--brand-border)] cc-fade"
         style={{ background: 'linear-gradient(135deg, var(--ink-700) 0%, var(--ink-800) 50%, var(--ink-900) 100%)' }}>
-        {/* Glow blobs */}
         <div className="absolute -top-24 -right-16 w-72 h-72 rounded-full pointer-events-none"
           style={{ background: 'radial-gradient(circle, var(--emerald-glow-strong) 0%, transparent 70%)' }} />
         <div className="absolute -bottom-20 -left-12 w-56 h-56 rounded-full pointer-events-none"
@@ -73,40 +221,70 @@ export default function Overview() {
             </p>
           </div>
 
-          {/* Wallet pill */}
           <div className="flex-shrink-0">
             <div className="rounded-2xl border border-[var(--brand-border)] p-5 min-w-[220px]"
               style={{ background: 'rgba(16,185,129,0.07)', backdropFilter: 'blur(12px)' }}>
               <p className="text-xs text-[var(--fg-muted)] mb-1 uppercase tracking-wider">Wallet Balance</p>
               <p className="font-mono text-3xl font-bold text-[var(--fg)] tracking-tight">{formatKES(walletBalance)}</p>
-              <div className="flex gap-2 mt-4">
-                <button className="cc-btn-primary text-xs py-2 px-4 flex-1">Deposit</button>
-                <button className="cc-btn-outline text-xs py-2 px-4 flex-1">Withdraw</button>
-              </div>
+              {/* <div className="flex gap-2 mt-4">
+                <button onClick={() => navigate('/dashboard/deposit')} className="cc-btn-primary text-xs py-2 px-4 flex-1">Deposit</button>
+                <button onClick={() => navigate('/dashboard/withdraw')} className="cc-btn-outline text-xs py-2 px-4 flex-1">Withdraw</button>
+              </div> */}
+            </div>
+
+            <div className="rounded-2xl border border-[var(--brand-border)] mt-4 p-4 bg-[var(--bg-alt)]">
+              <p className="text-xs text-[var(--fg-muted)] mb-2 uppercase tracking-wider">Referral</p>
+              {referralToken ? (
+                <div className="space-y-2">
+                  <p className="text-xs text-[var(--fg-muted)]">Share to invite friends:</p>
+                  <div className="flex items-center gap-2">
+                    <input
+                      readOnly
+                      value={referralLink}
+                      className="w-full rounded-lg border border-[var(--border)] px-2 py-1 text-xs bg-white"
+                    />
+                    <button
+                      className="cc-btn-primary text-xs px-2 py-1"
+                      onClick={() => { if (referralLink) navigator.clipboard.writeText(referralLink); }}
+                    >
+                      Copy
+                    </button>
+                  </div>
+                  {referredBy && (
+                    <p className="text-xs text-[var(--success)]">Referred by: {referredBy}</p>
+                  )}
+                </div>
+              ) : (
+                <p className="text-xs text-[var(--fg-muted)]">Profile not ready for referral link yet.</p>
+              )}
             </div>
           </div>
         </div>
 
-        {/* Mini sparkline */}
         <div className="h-20 px-6 pb-4 opacity-40">
           <ResponsiveContainer width="100%" height="100%">
             <AreaChart data={sparklineData} margin={{ top: 0, right: 0, left: 0, bottom: 0 }}>
-              <defs><linearGradient id="sg" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#10B981" stopOpacity={.4} /><stop offset="95%" stopColor="#10B981" stopOpacity={0} /></linearGradient></defs>
+              <defs>
+                <linearGradient id="sg" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#10B981" stopOpacity={.4} />
+                  <stop offset="95%" stopColor="#10B981" stopOpacity={0} />
+                </linearGradient>
+              </defs>
               <Area type="monotone" dataKey="v" stroke="#10B981" strokeWidth={1.5} fill="url(#sg)" dot={false} />
             </AreaChart>
           </ResponsiveContainer>
         </div>
       </div>
 
-      {/* ══ STAT CARDS ════════════════════════════════════════════════ */}
+      {/* STAT CARDS */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {[
-          { label: "Total Saved",     value: formatKES(totalContributed), icon: PiggyBank,  change: "+8%",  pos: true  },
-          { label: "Active Chamas",   value: activeGroups,                icon: Users,      change: `${activeGroups}`, pos: true },
-          { label: "Wallet",          value: formatKES(walletBalance),    icon: Wallet,     change: "+2%",  pos: true  },
-          { label: "Next Deadline",   value: "2 Days",                    icon: Calendar,   change: "Urgent",pos:false  },
+          { label: "Total Saved",   value: formatKES(totalContributed), icon: PiggyBank, change: "+8%",    pos: true  },
+          { label: "Active Chamas", value: activeGroups,                icon: Users,     change: `${activeGroups}`, pos: true },
+          { label: "Wallet",        value: formatKES(walletBalance),    icon: Wallet,    change: "+2%",    pos: true  },
+          { label: "Next Deadline", value: "2 Days",                    icon: Calendar,  change: "Urgent", pos: false },
         ].map((s, i) => (
-          <div key={s.label} className={`stat-card cc-fade`} style={{ animationDelay: `${i * 60}ms` }}>
+          <div key={s.label} className="stat-card cc-fade" style={{ animationDelay: `${i * 60}ms` }}>
             <div className="flex justify-between items-start mb-4">
               <div className="stat-icon"><s.icon className="w-5 h-5 text-[var(--brand-light)]" /></div>
               <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${s.pos ? 'bg-[var(--success-bg)] text-[var(--success)]' : 'bg-[var(--warning-bg)] text-[var(--warning)]'}`}>
@@ -119,7 +297,7 @@ export default function Overview() {
         ))}
       </div>
 
-      {/* ══ MAIN 2-COL ════════════════════════════════════════════════ */}
+      {/* MAIN 2-COL */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
         {/* Left: Chamas */}
@@ -132,7 +310,7 @@ export default function Overview() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {groups?.slice(0, 4).map((group, i) => {
+            {myGroups?.slice(0, 4).map((group, i) => {
               const pct = (parseFloat(group.current_amount || "0") / parseFloat(group.target_amount)) * 100;
               return (
                 <div key={group.id} className="cc-card hover-lift cursor-pointer cc-fade" style={{ animationDelay: `${i * 70}ms` }}>
@@ -145,29 +323,32 @@ export default function Overview() {
                     </div>
                     <div className="w-9 h-9 rounded-xl flex items-center justify-center text-xs font-bold text-[var(--brand-light)] flex-shrink-0"
                       style={{ background: 'var(--brand-tint)', border: '1px solid var(--brand-border)' }}>
-                      {group.name.split(' ').map((w: string) => w[0]).join('').slice(0,2).toUpperCase()}
+                      {group.name.split(' ').map((w: string) => w[0]).join('').slice(0, 2).toUpperCase()}
                     </div>
                   </div>
                   <div className="space-y-1.5">
                     <div className="flex justify-between text-xs text-[var(--fg-muted)]">
-                      <span>Progress</span><span className="font-mono font-semibold text-[var(--fg)]">{Math.round(pct)}%</span>
+                      <span>Progress</span>
+                      <span className="font-mono font-semibold text-[var(--fg)]">{Math.round(pct)}%</span>
                     </div>
                     <div className="cc-progress"><div className="cc-progress-bar" style={{ width: `${pct}%` }} /></div>
                     <div className="flex justify-between text-xs font-mono">
-                      <span className="text-[var(--brand-light)]">KES {parseFloat(group.current_amount||"0").toLocaleString()}</span>
+                      <span className="text-[var(--brand-light)]">KES {parseFloat(group.current_amount || "0").toLocaleString()}</span>
                       <span className="text-[var(--fg-muted)]">KES {parseFloat(group.target_amount).toLocaleString()}</span>
                     </div>
                   </div>
                 </div>
               );
             })}
-            {!groups?.length && (
+            {!myGroups?.length && (
               <div className="cc-card col-span-2 flex flex-col items-center py-14 gap-3 text-center">
                 <div className="w-12 h-12 rounded-2xl bg-[var(--bg-alt)] flex items-center justify-center">
                   <Gift className="w-5 h-5 text-[var(--fg-muted)]" />
                 </div>
-                <p className="text-sm text-[var(--fg-muted)]">No groups yet. Create your first chama!</p>
-                <button className="cc-btn-primary text-sm"><PlusCircle className="w-4 h-4" />New Chama</button>
+                <p className="text-sm text-[var(--fg-muted)]">No groups yet. Join or create your first chama!</p>
+                <button onClick={() => navigate('/dashboard/groups')} className="cc-btn-primary text-sm">
+                  <PlusCircle className="w-4 h-4" />Browse Groups
+                </button>
               </div>
             )}
           </div>
@@ -175,8 +356,6 @@ export default function Overview() {
 
         {/* Right: Procurement + Quick Actions */}
         <div className="space-y-5">
-
-          {/* Procurement Goal */}
           {procGroup && (
             <div className="cc-card-glow cc-fade cc-d2">
               <div className="flex justify-between items-start mb-4">
@@ -187,7 +366,10 @@ export default function Overview() {
                 <Target className="w-5 h-5 text-[var(--accent)]" />
               </div>
               <div className="space-y-1.5 mb-4">
-                <div className="flex justify-between text-sm"><span className="text-[var(--fg-muted)]">Progress</span><span className="font-mono font-semibold">{Math.round(procProgress)}%</span></div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-[var(--fg-muted)]">Progress</span>
+                  <span className="font-mono font-semibold">{Math.round(procProgress)}%</span>
+                </div>
                 <div className="cc-progress"><div className="cc-progress-bar" style={{ width: `${procProgress}%` }} /></div>
                 <div className="flex justify-between text-xs font-mono mt-2">
                   <span className="text-[var(--fg-muted)]">Remaining</span>
@@ -198,16 +380,16 @@ export default function Overview() {
             </div>
           )}
 
-          {/* Quick Actions */}
           <div className="cc-card cc-fade cc-d3">
             <p className="text-xs font-bold uppercase tracking-wider text-[var(--fg-muted)] mb-3">Quick Actions</p>
             <div className="space-y-2">
               {[
-                { label: 'New Chama',     icon: PlusCircle, color: 'brand' },
-                { label: 'Invite Member', icon: Send,        color: 'brand' },
-                { label: 'View Reports',  icon: BarChart3,  color: 'accent' },
+                { label: 'New Chama',     icon: PlusCircle, path: '/dashboard/new-chama' },
+                { label: 'Invite Member', icon: Send,        path: '/dashboard/invite' },
+                { label: 'View Reports',  icon: BarChart3,  path: '/dashboard/reports' },
               ].map(a => (
-                <button key={a.label} className="w-full flex items-center gap-3 p-3 rounded-xl border border-[var(--border)] hover:border-[var(--brand-border)] hover:bg-[var(--brand-tint)] transition-smooth text-left group">
+                <button key={a.label} onClick={() => navigate(a.path)}
+                  className="w-full flex items-center gap-3 p-3 rounded-xl border border-[var(--border)] hover:border-[var(--brand-border)] hover:bg-[var(--brand-tint)] transition-smooth text-left group">
                   <div className="w-8 h-8 rounded-lg bg-[var(--bg-alt)] flex items-center justify-center group-hover:bg-[var(--brand-tint)] transition-smooth">
                     <a.icon className="w-4 h-4 text-[var(--fg-muted)] group-hover:text-[var(--brand-light)] transition-smooth" />
                   </div>
@@ -220,21 +402,21 @@ export default function Overview() {
         </div>
       </div>
 
-      {/* ══ RECENT ACTIVITY ═══════════════════════════════════════════ */}
+      {/* RECENT ACTIVITY */}
       <div className="cc-fade cc-d4">
         <div className="flex justify-between items-center mb-4">
           <h2 className="cc-h3">Recent Activity</h2>
           <span className="text-xs text-[var(--fg-muted)]">{activities?.length || 0} events</span>
         </div>
         <div className="cc-card p-0 overflow-hidden">
-          {activities?.length === 0 || !activities ? (
+          {!activities?.length ? (
             <div className="flex flex-col items-center py-14 gap-3">
               <Sparkles className="w-8 h-8 text-[var(--fg-muted)]" />
               <p className="text-sm text-[var(--fg-muted)]">No recent activity. Start contributing!</p>
             </div>
           ) : (
             <div className="divide-y divide-[var(--border)]">
-              {activities.map((act: any, i: number) => (
+              {activities.map((act: DashboardActivity, i: number) => (
                 <div key={act.id || i} className="flex items-center justify-between px-5 py-4 hover:bg-[var(--bg-alt)] transition-smooth">
                   <div className="flex items-center gap-3">
                     <div className="w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold text-[var(--brand-light)]"
@@ -243,7 +425,9 @@ export default function Overview() {
                     </div>
                     <div>
                       <p className="text-sm font-semibold text-[var(--fg)]">{act.user}</p>
-                      <p className="text-xs text-[var(--fg-muted)] flex items-center gap-1"><Clock className="w-3 h-3" />{act.time}</p>
+                      <p className="text-xs text-[var(--fg-muted)] flex items-center gap-1">
+                        <Clock className="w-3 h-3" />{act.time}
+                      </p>
                     </div>
                   </div>
                   <div className="flex items-center gap-2">

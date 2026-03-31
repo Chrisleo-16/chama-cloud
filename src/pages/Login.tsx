@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { ApiError, getUserFromToken } from "@/lib/api";
+import { ApiError } from "@/lib/api";
 import { Loader2, Phone, Lock, Sprout } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
@@ -13,7 +13,7 @@ export default function Login() {
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
-  const { login } = useAuth();
+  const { login, profile, userRole } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -21,15 +21,27 @@ export default function Login() {
     e.preventDefault();
     setLoading(true);
     try {
-      const loginData = await login(phone, password);
-      const user = getUserFromToken();
-      const role = user?.role || (loginData as any)?.role || "MERCHANT";
-      const destination = role === "WHOLESALER" ? "/wholesaler" : "/dashboard";
+      // login() calls api.login() which caches profile from /token/ response,
+      // then calls updateAuthState() which fetches /auth/profile/ and sets
+      // userRole in context. We read role from the cached profile in localStorage
+      // because context state may not have re-rendered yet.
+      await login(phone, password);
+
+      const cachedProfile = localStorage.getItem("user_profile");
+      const role = cachedProfile
+        ? (JSON.parse(cachedProfile).role as string)
+        : localStorage.getItem("user_role") || "MERCHANT";
+
+      let destination = "/dashboard";
+      if (role === "ADMIN") destination = "/admin";
+      else if (role === "WHOLESALER") destination = "/wholesaler";
+
       navigate(destination, { replace: true });
     } catch (err) {
-      const message = err instanceof ApiError
-        ? "Invalid phone number or password"
-        : "Something went wrong. Please try again.";
+      const message =
+        err instanceof ApiError
+          ? "Invalid phone number or password"
+          : "Something went wrong. Please try again.";
       toast({ title: "Login failed", description: message, variant: "destructive" });
     } finally {
       setLoading(false);
@@ -85,7 +97,7 @@ export default function Login() {
               </div>
 
               <Button type="submit" className="w-full cc-btn-primary" disabled={loading}>
-                {loading && <Loader2 className="h-4 w-4 animate-spin" />}
+                {loading && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
                 Sign in
               </Button>
             </form>
