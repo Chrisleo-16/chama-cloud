@@ -247,7 +247,7 @@ export default function Groups() {
   const { data: groups,        isLoading: gL } = useQuery({ queryKey: ["groups"],       queryFn: groupsApi.list });
   const { data: contributions              }   = useQuery({ queryKey: ["contributions"], queryFn: contributionsApi.list });
 
-  // ── Groups the current user has contributed to (real-time from API) ───────
+  // ── Groups the current user has contributed to OR created ───────
   const myGroupIds = new Set(
     (contributions || [])
       .filter(c => {
@@ -259,6 +259,45 @@ export default function Groups() {
       .map(c => c.group)
   );
 
+  // Debug: Log all groups to see what's available
+  console.log('🔍 Groups Debug:', {
+    totalGroups: groups?.length,
+    allGroups: groups?.map(g => ({
+      id: g.id,
+      name: g.name,
+      wholesaler: g.wholesaler,
+      wholesaler_name: g.wholesaler_name,
+      is_active: g.is_active
+    })),
+    userProfile: {
+      id: profile?.id,
+      name: profile?.first_name,
+      role: userRole
+    }
+  });
+
+  // Also include groups created by the current user
+  const createdGroupIds = new Set(
+    (groups || [])
+      .filter(g => {
+        if (!profile) return false;
+        // For wholesalers, check if they're assigned as wholesaler
+        if (userRole === "WHOLESALER" && g.wholesaler === profile.id) return true;
+        
+        // TEMPORARY: For merchants, show groups without a wholesaler (likely created by them)
+        if (userRole === "MERCHANT" && !g.wholesaler && g.is_active) {
+          console.log('✅ Likely merchant-created group:', { groupId: g.id, groupName: g.name });
+          return true;
+        }
+        
+        return false;
+      })
+      .map(g => g.id)
+  );
+
+  // Combine both sets: contributed groups + created groups
+  const allMyGroupIds = new Set([...myGroupIds, ...createdGroupIds]);
+
   const displayGroups = (groups || []).filter(g => {
     const matchSearch =
       g.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -266,7 +305,7 @@ export default function Groups() {
     if (!matchSearch) return false;
 
     if (viewMode === "mine") {
-      return myGroupIds.has(g.id);
+      return allMyGroupIds.has(g.id);
     }
 
     // "Discover all" — rank local matches first but show all
@@ -499,7 +538,7 @@ export default function Groups() {
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
           {sortedGroups.map((g, idx) => {
             const pct      = parseFloat(g.progress_percentage || "0");
-            const isMember = myGroupIds.has(g.id);
+            const isMember = allMyGroupIds.has(g.id);
             // Show "local match" badge in discover mode
             const isLocal  = viewMode === "all" && (
               (g.description || "").toLowerCase().includes(profileLocation) ||
@@ -529,8 +568,15 @@ export default function Groups() {
                       </h3>
                       {g.is_fully_funded === "True" &&
                         <span className="cc-badge cc-badge-success text-[10px]">✓ Funded</span>}
-                      {isMember &&
-                        <span className="cc-badge cc-badge-brand text-[10px]">● Member</span>}
+                      {isMember && (
+                        <>
+                          {createdGroupIds.has(g.id) ? (
+                            <span className="cc-badge cc-badge-success text-[10px]">👤 Created</span>
+                          ) : (
+                            <span className="cc-badge cc-badge-brand text-[10px]">● Member</span>
+                          )}
+                        </>
+                      )}
                       {isLocal && !isMember &&
                         <span className="cc-badge cc-badge-warning text-[10px]">📍 Near you</span>}
                     </div>
