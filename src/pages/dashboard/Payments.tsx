@@ -3,8 +3,9 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { paymentsApi, groupsApi, contributionsApi, userApi } from "@/lib/api";
+import { paymentsApi, groupsApi, contributionsApi } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
 import {
   Loader2, Smartphone, CreditCard, History, CheckCircle, XCircle,
   Clock, Zap, Shield, ArrowRight, Send, Wifi
@@ -26,9 +27,11 @@ export default function Payments() {
   const { toast }             = useToast();
   const queryClient           = useQueryClient();
 
+  // ── Auth context gives us profile + role already fetched ─────────────────
+  const { profile, userRole, loading: authLoading } = useAuth();
+
   const { data: groups,        isLoading: gL } = useQuery({ queryKey: ["groups"],        queryFn: groupsApi.list });
   const { data: contributions, isLoading: cL } = useQuery({ queryKey: ["contributions"], queryFn: contributionsApi.list });
-  const { data: profile,      isLoading: pL } = useQuery({ queryKey: ["profile"],       queryFn: userApi.getProfile });
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
 
@@ -45,7 +48,7 @@ export default function Payments() {
   });
 
   const myGroups = (groups || []).filter((g) => {
-    if (profile?.role === "WHOLESALER" && currentUserId) {
+    if (userRole === "WHOLESALER" && currentUserId) {
       return g.wholesaler === currentUserId;
     }
 
@@ -181,7 +184,7 @@ export default function Payments() {
                 <div className="flex-1">
                   <p className="text-sm text-[var(--fg-muted)] leading-relaxed pt-1">{step.text}</p>
                   {i < STEPS.length - 1 && (
-                    <div className="ml-[-28px] mt-3 mb-0 w-px h-4 bg-[var(--border-mid)] ml-4" />
+                    <div className="ml-4 mt-3 mb-0 w-px h-4 bg-[var(--border-mid)]" />
                   )}
                 </div>
               </div>
@@ -214,7 +217,7 @@ export default function Payments() {
         </div>
 
         <div className="cc-card p-0 overflow-hidden">
-          {cL ? (
+          {authLoading || cL ? (
             <div className="flex justify-center py-12"><Loader2 className="w-6 h-6 text-[var(--brand-light)] cc-spin" /></div>
           ) : sortedContribs.length === 0 ? (
             <div className="flex flex-col items-center py-14 gap-3">

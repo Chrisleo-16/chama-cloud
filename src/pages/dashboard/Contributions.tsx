@@ -2,10 +2,11 @@
 
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { contributionsApi, groupsApi, userApi, type Contribution } from "@/lib/api";
+import { contributionsApi, groupsApi, type Contribution } from "@/lib/api";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
 import {
   Plus, Loader2, Trash2, Coins, CheckCircle, XCircle, Clock,
   ArrowUpRight, Filter, Search, Download, TrendingUp
@@ -32,17 +33,17 @@ export default function Contributions() {
   const queryClient                 = useQueryClient();
   const { toast }                   = useToast();
 
+  // ── Auth context gives us profile + role already fetched ─────────────────
+  const { profile, userRole, loading: authLoading } = useAuth();
+
   const { data: contributions, isLoading } = useQuery({ queryKey: ["contributions"], queryFn: contributionsApi.list });
   const { data: groups }                   = useQuery({ queryKey: ["groups"],        queryFn: groupsApi.list });
-  const { data: profile }                  = useQuery({ queryKey: ["profile"],       queryFn: userApi.getProfile });
 
   const currentUserId = profile?.id;
-  const userRole = profile?.role;
 
   // Filter contributions to only show current user's contributions
   const myContributions = (contributions || []).filter((c) => {
-    if (!profile) return false;
-    if (!currentUserId) return false; // avoid global fallback, make data user-specific
+    if (!profile || !currentUserId) return false;
 
     // Prefer numeric match by user id if available (merchant field points at merchant user)
     if (c.merchant && +c.merchant === +currentUserId) return true;
@@ -101,7 +102,7 @@ export default function Contributions() {
     return matchesStatus && matchesSearch;
   });
 
-  if (isLoading) return <div className="flex items-center justify-center h-64"><Loader2 className="w-8 h-8 text-[var(--brand-light)] cc-spin" /></div>;
+  if (authLoading || isLoading) return <div className="flex items-center justify-center h-64"><Loader2 className="w-8 h-8 text-[var(--brand-light)] cc-spin" /></div>;
 
   return (
     <div className="space-y-8 max-w-[1440px] mx-auto pb-16">

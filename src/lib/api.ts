@@ -5,6 +5,14 @@ const API_BASE = "https://chama-cloud-api.onrender.com/api";
 export interface TokenPair {
   access: string;
   refresh: string;
+  // Extra fields the /token/ endpoint returns alongside the tokens
+  first_name?: string;
+  last_name?: string;
+  phone_number?: string;
+  role?: "MERCHANT" | "WHOLESALER" | "ADMIN";
+  business_name?: string;
+  is_verified_wholesaler?: boolean;
+  user_id?: string | number;
 }
 
 export interface UserRegistration {
@@ -65,9 +73,8 @@ export interface Wholesaler {
   is_verified_wholesaler?: boolean;
 }
 
-// GET /api/groups/vouchers/ — merchant's own vouchers
 export interface MerchantVoucher {
-  id: string;           // UUID
+  id: string;
   group_name: string;
   wholesaler_name: string;
   amount_paid: string;
@@ -76,9 +83,8 @@ export interface MerchantVoucher {
   claimed_at: string | null;
 }
 
-// GET /api/groups/wholesaler/vouchers/ — wholesaler's vouchers to fulfil
 export interface Voucher {
-  id: string;           // UUID
+  id: string;
   group_name: string;
   wholesaler_name: string;
   amount_paid: string;
@@ -107,12 +113,11 @@ export interface Activity {
   type: "deposit" | "withdrawal";
 }
 
-// ── Credit Engine types (client-side computed) ───────────────────────────────
 export interface CreditScore {
-  score: number;           // 0–100
+  score: number;
   grade: "A" | "B" | "C" | "D" | "F";
   eligible: boolean;
-  maxLoan: number;         // KES
+  maxLoan: number;
   reasons: string[];
   recommendations: string[];
 }
@@ -144,6 +149,10 @@ function setTokens(tokens: TokenPair) {
 export function clearTokens() {
   localStorage.removeItem("cc_access");
   localStorage.removeItem("cc_refresh");
+  localStorage.removeItem("user_profile");
+  localStorage.removeItem("cc_first_name");
+  localStorage.removeItem("cc_last_name");
+  localStorage.removeItem("user_role");
 }
 
 // ==================== JWT helpers ====================
@@ -157,58 +166,23 @@ function decodeToken(token: string): Record<string, unknown> | null {
 }
 
 export function getUserRole(): string | null {
+  const storedRole = localStorage.getItem("user_role");
+  if (storedRole) return storedRole;
   const token = localStorage.getItem("cc_access");
   if (!token) return null;
   const payload = decodeToken(token);
   return (payload?.role as string) || null;
 }
 
-export function getUserFromToken(): UserProfile | null {
+export function getUserIdFromToken(): string | null {
   const token = localStorage.getItem("cc_access");
   if (!token) return null;
   const payload = decodeToken(token);
   if (!payload) return null;
-
-  // Start with token data (may be empty)
-  let firstName = "";
-  let lastName = "";
-  let phoneNumber = (payload.phone_number as string) || (payload.phone as string) || "";
-  let role = (payload.role as "MERCHANT" | "WHOLESALER" | "ADMIN") || "MERCHANT";
-  let businessName = (payload.business_name as string) || undefined;
-  let businessAddress = (payload.business_address as string) || undefined;
-  let businessCategory = (payload.business_category as string) || undefined;
-  let isVerifiedWholesaler = (payload.is_verified_wholesaler as boolean) || false;
-
-  // Override with localStorage items if present (set during registration or profile fetch)
-  const storedFirstName = localStorage.getItem("cc_first_name");
-  const storedLastName = localStorage.getItem("cc_last_name");
-  if (storedFirstName) firstName = storedFirstName;
-  if (storedLastName) lastName = storedLastName;
-
-  // If still empty, try to extract from token's name field (if any)
-  if (!firstName && payload.name) {
-    const nameParts = (payload.name as string).split(' ');
-    firstName = nameParts[0] || "";
-    lastName = nameParts.slice(1).join(' ') || "";
-  }
-
-  // Fallback to "User" only if no first name
-  if (!firstName) firstName = "User";
-
-  return {
-    id: (payload.user_id as number) || (payload.id as number),
-    first_name: firstName,
-    last_name: lastName,
-    phone_number: phoneNumber,
-    role,
-    business_name: businessName,
-    business_address: businessAddress,
-    business_category: businessCategory,
-    is_verified_wholesaler: isVerifiedWholesaler,
-  };
+  return String(payload.user_id || payload.id || "");
 }
 
-// // ==================== Token refresh ====================
+// ==================== Token refresh ====================
 
 let refreshPromise: Promise<string | null> | null = null;
 
@@ -292,19 +266,36 @@ export async function login(phone_number: string, password: string) {
     body: JSON.stringify({ phone_number, password }),
   });
   setTokens(data);
+
+  // /token/ returns profile fields alongside the tokens.
+  // Cache them right away so the dashboard has real data
+  // before /auth/profile/ even responds.
+  const profileFromLogin: UserProfile = {
+    id: data.user_id ? Number(data.user_id) : undefined,
+    first_name: data.first_name || "",
+    last_name: data.last_name || "",
+    phone_number: data.phone_number || phone_number,
+    role: data.role || "MERCHANT",
+    business_name: data.business_name,
+    is_verified_wholesaler: data.is_verified_wholesaler ?? false,
+  };
+  localStorage.setItem("user_profile", JSON.stringify(profileFromLogin));
+  if (data.role) localStorage.setItem("user_role", data.role);
+
   return data;
 }
 
 export function logout() { clearTokens(); }
 export function isAuthenticated(): boolean { return !!getTokens()?.access; }
 
-// ==================== User Profile (JWT-decoded) ====================
+// ==================== User Profile ====================
 
 export const userApi = {
   getProfile: async (): Promise<UserProfile> => {
-    const fromToken = getUserFromToken();
-    if (fromToken) return fromToken;
-    throw new Error("Not authenticated");
+    // Always fetch from the real endpoint — JWT has no profile fields
+    const profile = await apiFetch<UserProfile>("/auth/profile/");
+    if (profile.role) localStorage.setItem("user_role", profile.role);
+    return profile;
   },
 };
 
@@ -320,9 +311,7 @@ export const groupsApi = {
     method: "PATCH", body: JSON.stringify(data),
   }),
   delete: (id: number) => apiFetch<void>(`/groups/list/${id}/`, { method: "DELETE" }),
-
-  // Join a group — PATCH the group to add current user as member
-  join: (id: number) => apiFetch<ChamaGroup>(`/groups/list/${id}/`, {
+  join:   (id: number) => apiFetch<ChamaGroup>(`/groups/list/${id}/`, {
     method: "PATCH",
     body: JSON.stringify({ join: true }),
   }),
@@ -343,7 +332,6 @@ export const contributionsApi = {
 };
 
 // ==================== Merchant Vouchers ====================
-// GET /api/groups/vouchers/ — vouchers belonging to the logged-in merchant
 
 export const vouchersApi = {
   list: () => apiFetch<MerchantVoucher[]>("/groups/vouchers/"),
@@ -406,59 +394,44 @@ export const activitiesApi = {
 };
 
 // ==================== Credit Engine (client-side) ====================
-// Evaluates loan eligibility based on contribution history and group health.
-// No dedicated backend endpoint — computed from existing data.
 
 export const creditEngine = {
-  scoreMerchant: (
-    contributions: Contribution[],
-    groups: ChamaGroup[],
-  ): CreditScore => {
+  scoreMerchant: (contributions: Contribution[], groups: ChamaGroup[]): CreditScore => {
     const reasons: string[] = [];
     const recommendations: string[] = [];
     let score = 0;
 
-    const completed  = contributions.filter(c => c.status === "COMPLETED");
-    const total      = contributions.length;
+    const completed   = contributions.filter(c => c.status === "COMPLETED");
+    const total       = contributions.length;
     const successRate = total > 0 ? completed.length / total : 0;
     const totalAmount = completed.reduce((s, c) => s + parseFloat(c.amount), 0);
 
-    // 1. Contribution consistency (30 pts)
     if (total >= 10)      { score += 30; reasons.push("10+ contributions made"); }
-    else if (total >= 5)  { score += 20; reasons.push("5–9 contributions made"); }
+    else if (total >= 5)  { score += 20; reasons.push("5-9 contributions made"); }
     else if (total >= 1)  { score += 10; reasons.push("At least 1 contribution made"); }
     else                  { recommendations.push("Make your first contribution to build credit"); }
 
-    // 2. Success rate (25 pts)
     if (successRate >= 0.9)      { score += 25; reasons.push("Excellent payment success rate (90%+)"); }
     else if (successRate >= 0.7) { score += 15; reasons.push("Good payment success rate (70%+)"); }
     else if (successRate >= 0.5) { score += 5;  recommendations.push("Improve payment success rate"); }
-    else                         { recommendations.push("Many failed payments — resolve pending issues"); }
+    else                         { recommendations.push("Many failed payments - resolve pending issues"); }
 
-    // 3. Total contributed (20 pts)
-    if (totalAmount >= 50000)     { score += 20; reasons.push("Contributed KES 50,000+"); }
-    else if (totalAmount >= 10000){ score += 12; reasons.push("Contributed KES 10,000+"); }
-    else if (totalAmount >= 1000) { score += 6;  reasons.push("Contributed KES 1,000+"); }
-    else                          { recommendations.push("Increase total contributions to improve score"); }
+    if (totalAmount >= 50000)      { score += 20; reasons.push("Contributed KES 50,000+"); }
+    else if (totalAmount >= 10000) { score += 12; reasons.push("Contributed KES 10,000+"); }
+    else if (totalAmount >= 1000)  { score += 6;  reasons.push("Contributed KES 1,000+"); }
+    else                           { recommendations.push("Increase total contributions to improve score"); }
 
-    // 4. Group membership (15 pts)
     const myGroupIds = new Set(contributions.map(c => c.group));
     const myGroups   = groups.filter(g => myGroupIds.has(g.id));
-    if (myGroups.length >= 3)     { score += 15; reasons.push("Member of 3+ groups"); }
-    else if (myGroups.length >= 1){ score += 8;  reasons.push("Member of at least 1 group"); }
-    else                          { recommendations.push("Join a chama group to improve eligibility"); }
+    if (myGroups.length >= 3)      { score += 15; reasons.push("Member of 3+ groups"); }
+    else if (myGroups.length >= 1) { score += 8;  reasons.push("Member of at least 1 group"); }
+    else                           { recommendations.push("Join a chama group to improve eligibility"); }
 
-    // 5. Active group bonus (10 pts)
     const activeGroups = myGroups.filter(g => g.is_active);
-    if (activeGroups.length > 0)  { score += 10; reasons.push(`Active in ${activeGroups.length} group(s)`); }
-    else                          { recommendations.push("Ensure your groups are active"); }
+    if (activeGroups.length > 0) { score += 10; reasons.push(`Active in ${activeGroups.length} group(s)`); }
+    else                         { recommendations.push("Ensure your groups are active"); }
 
-    const grade =
-      score >= 80 ? "A" :
-      score >= 65 ? "B" :
-      score >= 50 ? "C" :
-      score >= 35 ? "D" : "F";
-
+    const grade = score >= 80 ? "A" : score >= 65 ? "B" : score >= 50 ? "C" : score >= 35 ? "D" : "F";
     const eligible = score >= 50;
     const maxLoan  = eligible ? Math.round(totalAmount * (score / 100) * 2) : 0;
 
@@ -469,41 +442,32 @@ export const creditEngine = {
     const reasons: string[] = [];
     let score = 0;
 
-    const current  = parseFloat(group.current_amount || "0");
-    const target   = parseFloat(group.target_amount  || "1");
-    const progress = current / target;
+    const current       = parseFloat(group.current_amount || "0");
+    const target        = parseFloat(group.target_amount  || "1");
+    const progress      = current / target;
     const groupContribs = contributions.filter(c => c.group === group.id);
     const completed     = groupContribs.filter(c => c.status === "COMPLETED");
 
-    // 1. Funding progress (35 pts)
     if (progress >= 0.75)      { score += 35; reasons.push("75%+ funded"); }
     else if (progress >= 0.5)  { score += 25; reasons.push("50%+ funded"); }
     else if (progress >= 0.25) { score += 15; reasons.push("25%+ funded"); }
-    else                       { reasons.push("Less than 25% funded — needs more contributions"); }
+    else                       { reasons.push("Less than 25% funded - needs more contributions"); }
 
-    // 2. Member count (25 pts)
     const members = group.members_count || 0;
     if (members >= 10)      { score += 25; reasons.push("10+ active members"); }
-    else if (members >= 5)  { score += 15; reasons.push("5–9 members"); }
-    else if (members >= 2)  { score += 8;  reasons.push("2–4 members"); }
+    else if (members >= 5)  { score += 15; reasons.push("5-9 members"); }
+    else if (members >= 2)  { score += 8;  reasons.push("2-4 members"); }
     else                    { reasons.push("Low membership"); }
 
-    // 3. Contribution volume (25 pts)
-    if (completed.length >= 20) { score += 25; reasons.push("20+ completed contributions"); }
+    if (completed.length >= 20)      { score += 25; reasons.push("20+ completed contributions"); }
     else if (completed.length >= 10) { score += 15; reasons.push("10+ completed contributions"); }
     else if (completed.length >= 5)  { score += 8;  reasons.push("5+ completed contributions"); }
 
-    // 4. Active status (15 pts)
     if (group.is_active) { score += 15; reasons.push("Group is active"); }
 
-    const grade =
-      score >= 80 ? "A" :
-      score >= 65 ? "B" :
-      score >= 50 ? "C" :
-      score >= 35 ? "D" : "F";
-
-    const eligible    = score >= 50;
-    const fundingGap  = Math.max(0, target - current);
+    const grade        = score >= 80 ? "A" : score >= 65 ? "B" : score >= 50 ? "C" : score >= 35 ? "D" : "F";
+    const eligible     = score >= 50;
+    const fundingGap   = Math.max(0, target - current);
     const maxGroupLoan = eligible ? Math.round(current * 0.5) : 0;
 
     return { groupId: group.id, groupName: group.name, score, grade, eligible, fundingGap, maxGroupLoan, reasons };
