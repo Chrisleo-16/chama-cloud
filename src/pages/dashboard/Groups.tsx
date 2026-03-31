@@ -505,6 +505,16 @@ export default function Groups() {
               (g.description || "").toLowerCase().includes(profileLocation) ||
               (g.description || "").toLowerCase().includes(profileCategory)
             );
+            
+            // Calculate actual member count from contributions
+            const memberCount = (contributions || [])
+              .filter(c => c.group === g.id)
+              .reduce((unique, c) => {
+                // Count unique merchants by ID or name
+                const identifier = c.merchant || c.merchant_name || 'unknown';
+                unique.add(identifier);
+                return unique;
+              }, new Set()).size;
 
             return (
               <div key={g.id} className="cc-card hover-lift group"
@@ -572,7 +582,7 @@ export default function Groups() {
                 {/* Footer */}
                 <div className="mt-4 pt-4 border-t border-[var(--border)] flex items-center justify-between text-xs text-[var(--fg-muted)]">
                   <div className="flex items-center gap-1.5">
-                    <Users className="w-3.5 h-3.5" />{g.members_count || 0} members
+                    <Users className="w-3.5 h-3.5" />{memberCount} members
                   </div>
                   <div className="flex items-center gap-2">
                     {isMember ? (

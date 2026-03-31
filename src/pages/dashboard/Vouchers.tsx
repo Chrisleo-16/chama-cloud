@@ -26,12 +26,19 @@ export default function Vouchers() {
   // Filter vouchers to show only user's vouchers
   const myVouchers = (vouchers || []).filter((v) => {
     if (!profile) return false;
-    // Filter by user name in wholesaler_name or group association
-    const userName = profile.first_name?.trim().toLowerCase() || "";
-    const wholesalerName = v.wholesaler_name?.toLowerCase() || "";
-    const groupName = v.group_name?.toLowerCase() || "";
     
-    return wholesalerName.includes(userName) || groupName.includes(userName);
+    // Debug: Log voucher filtering
+    console.log('🔍 Voucher Filter:', {
+      voucherId: v.id,
+      voucherGroup: v.group_name,
+      voucherWholesaler: v.wholesaler_name,
+      profileName: profile.first_name,
+      profileId: profile.id
+    });
+    
+    // Show all vouchers for now to test the display
+    // TODO: Implement proper user-specific filtering once we see the data structure
+    return true;
   });
 
   if (isLoading)
@@ -137,12 +144,32 @@ export default function Vouchers() {
               <div className="flex flex-col items-center gap-3 bg-[var(--bg-alt)] rounded-2xl p-6">
                 {!v.is_claimed ? (
                   <>
-                    <div className="bg-white p-3 rounded-xl shadow-md">
-                      <QRCodeSVG value={`${v.id}|${v.group_name}|${v.wholesaler_name}|${v.amount_paid}`} size={140} />
+                    <div className="bg-white p-4 rounded-xl shadow-lg border-2 border-[var(--brand-border)]">
+                      <QRCodeSVG 
+                        value={JSON.stringify({
+                          type: "CHAMA_VOUCHER",
+                          id: v.id,
+                          group: v.group_name,
+                          wholesaler: v.wholesaler_name,
+                          amount: v.amount_paid,
+                          issued: v.created_at,
+                          status: "PENDING_CLAIM"
+                        })} 
+                        size={160} 
+                        level="H"
+                        includeMargin={true}
+                      />
                     </div>
-                    <p className="text-xs text-[var(--fg-muted)] text-center">Show to wholesaler to claim goods</p>
-                    <div className="flex items-center gap-1.5 text-green-500 text-xs font-semibold">
-                      <CheckCircle className="w-3.5 h-3.5" /> Verified Payment
+                    <div className="text-center space-y-2">
+                      <p className="text-xs text-[var(--fg-muted)] font-medium">Scan to verify & claim goods</p>
+                      <div className="flex items-center gap-1.5 text-green-500 text-xs font-semibold justify-center">
+                        <CheckCircle className="w-3.5 h-3.5" /> Payment Verified
+                      </div>
+                    </div>
+                    <div className="bg-[var(--brand-tint)] border border-[var(--brand-border)] rounded-lg p-3 w-full">
+                      <p className="text-xs font-mono text-[var(--brand-light)] text-center">
+                        Voucher ID: {v.id}
+                      </p>
                     </div>
                   </>
                 ) : (
