@@ -5,6 +5,7 @@ import { vouchersApi } from "@/lib/api";
 import { QRCodeSVG } from "qrcode.react";
 import { Loader2, Download, Package, CheckCircle, AlertCircle, Clock, TicketCheck } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
 
 const formatKES = (n: number | string) =>
   new Intl.NumberFormat("en-KE", { style: "currency", currency: "KES", minimumFractionDigits: 0 })
@@ -15,10 +16,22 @@ const fmtDate = (d: string | null) =>
 
 export default function Vouchers() {
   const { toast } = useToast();
+  const { profile, loading: authLoading } = useAuth();
 
   const { data: vouchers, isLoading } = useQuery({
     queryKey: ["merchant-vouchers"],
     queryFn: vouchersApi.list,
+  });
+
+  // Filter vouchers to show only user's vouchers
+  const myVouchers = (vouchers || []).filter((v) => {
+    if (!profile) return false;
+    // Filter by user name in wholesaler_name or group association
+    const userName = profile.first_name?.trim().toLowerCase() || "";
+    const wholesalerName = v.wholesaler_name?.toLowerCase() || "";
+    const groupName = v.group_name?.toLowerCase() || "";
+    
+    return wholesalerName.includes(userName) || groupName.includes(userName);
   });
 
   if (isLoading)
@@ -28,7 +41,7 @@ export default function Vouchers() {
       </div>
     );
 
-  if (!vouchers || vouchers.length === 0)
+  if (!myVouchers || myVouchers.length === 0)
     return (
       <div className="max-w-4xl mx-auto space-y-8">
         <div className="cc-fade">
@@ -65,7 +78,7 @@ export default function Vouchers() {
 
       {/* Voucher cards */}
       <div className="space-y-6">
-        {vouchers.map((v, idx) => (
+        {myVouchers.map((v, idx) => (
           <div key={v.id} className="cc-card cc-fade" style={{ animationDelay: `${idx * 80}ms` }}>
 
             {/* Voucher header */}

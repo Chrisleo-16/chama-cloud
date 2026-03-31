@@ -105,43 +105,24 @@ export default function Overview() {
 
   // ── Derived data ──────────────────────────────────────────────────────────
   const myContributions = (contributions || []).filter((c) => {
-    if (!profile || !currentUserId) return false;
+    if (!profile) return false;
     
-    // Primary match: by merchant ID
-    if (c.merchant && +c.merchant === +currentUserId) {
-      console.log('✅ Matched by ID:', { contributionId: c.id, merchantId: c.merchant, userId: currentUserId });
+    // Primary match: by merchant ID (same as Groups page)
+    if (c.merchant && profile.id && +c.merchant === +profile.id) {
+      console.log('✅ Matched by ID:', { contributionId: c.id, merchantId: c.merchant, userId: profile.id });
       return true;
     }
     
-    // Secondary match: by merchant name (for cases where ID might not match)
-    const merchantName = profile.first_name?.trim().toLowerCase() || "";
-    const contributionMerchantName = c.merchant_name?.trim().toLowerCase() || "";
-    
-    if (merchantName && contributionMerchantName) {
-      const nameMatch = contributionMerchantName.startsWith(merchantName) || 
-                       contributionMerchantName.includes(merchantName) ||
-                       merchantName.startsWith(contributionMerchantName);
-      
-      if (nameMatch) {
-        console.log('✅ Matched by name:', { 
-          contributionId: c.id, 
-          profileName: merchantName, 
-          contributionName: contributionMerchantName 
-        });
-        return true;
-      }
+    // Secondary match: by merchant name (same as Groups page)
+    const name = profile.first_name?.trim().toLowerCase() || "";
+    if (name && c.merchant_name?.toLowerCase().startsWith(name)) {
+      console.log('✅ Matched by name:', { 
+        contributionId: c.id, 
+        profileName: name, 
+        contributionName: c.merchant_name 
+      });
+      return true;
     }
-    
-    // Log unmatched contributions for debugging
-    console.log('❌ Unmatched contribution:', {
-      id: c.id,
-      amount: c.amount,
-      status: c.status,
-      merchant: c.merchant,
-      merchant_name: c.merchant_name,
-      currentUserId,
-      profileName: profile.first_name
-    });
     
     return false;
   });
@@ -245,10 +226,10 @@ export default function Overview() {
               style={{ background: 'rgba(16,185,129,0.07)', backdropFilter: 'blur(12px)' }}>
               <p className="text-xs text-[var(--fg-muted)] mb-1 uppercase tracking-wider">Wallet Balance</p>
               <p className="font-mono text-3xl font-bold text-[var(--fg)] tracking-tight">{formatKES(walletBalance)}</p>
-              <div className="flex gap-2 mt-4">
+              {/* <div className="flex gap-2 mt-4">
                 <button onClick={() => navigate('/dashboard/deposit')} className="cc-btn-primary text-xs py-2 px-4 flex-1">Deposit</button>
                 <button onClick={() => navigate('/dashboard/withdraw')} className="cc-btn-outline text-xs py-2 px-4 flex-1">Withdraw</button>
-              </div>
+              </div> */}
             </div>
 
             <div className="rounded-2xl border border-[var(--brand-border)] mt-4 p-4 bg-[var(--bg-alt)]">

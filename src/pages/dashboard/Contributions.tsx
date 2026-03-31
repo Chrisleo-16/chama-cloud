@@ -41,18 +41,16 @@ export default function Contributions() {
 
   const currentUserId = profile?.id;
 
-  // Filter contributions to only show current user's contributions
+  // Filter contributions to only show current user's contributions (same logic as Groups page)
   const myContributions = (contributions || []).filter((c) => {
-    if (!profile || !currentUserId) return false;
+    if (!profile) return false;
 
-    // Prefer numeric match by user id if available (merchant field points at merchant user)
-    if (c.merchant && +c.merchant === +currentUserId) return true;
+    // Primary match: by merchant ID (same as Groups page)
+    if (c.merchant && profile.id && +c.merchant === +profile.id) return true;
 
-    // Fallback by merchant_name exact or starts-with (less aggressive)
-    const merchantName = profile.first_name ? `${profile.first_name}`.trim().toLowerCase() : "";
-    if (merchantName && c.merchant_name && c.merchant_name.toLowerCase().startsWith(merchantName)) return true;
-
-    return false;
+    // Secondary match: by merchant name (same as Groups page)
+    const name = profile.first_name?.trim().toLowerCase() || "";
+    return name && c.merchant_name?.toLowerCase().startsWith(name);
   });
 
   // Filter groups to show appropriate groups for each role
