@@ -170,7 +170,7 @@ export default function Register() {
                   <SelectContent>
                     <SelectItem value="MERCHANT">Merchant (Retailer)</SelectItem>
                     <SelectItem value="WHOLESALER">Wholesaler (Supplier)</SelectItem>
-                    <SelectItem value="ADMIN">System Administrator</SelectItem>
+                    {/* <SelectItem value="ADMIN">System Administrator</SelectItem> */}
                   </SelectContent>
                 </Select>
               </div>
